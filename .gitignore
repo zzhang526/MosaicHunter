@@ -1,3 +1,8 @@
+sh/*
+log/*
+data/*
+tmp/*
+
 *.class
 
 # Mobile Tools for Java (J2ME)
