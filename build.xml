@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+
+<project name="MosaicHunter" default="onejar" basedir=".">
+
+    <taskdef name="one-jar" classname="com.simontuffs.onejar.ant.OneJarTask"
+         classpath="lib/one-jar-ant-task-0.97.jar" onerror="report"/>
+
+    <property name="package" value="cn.edu.pku.cbi.mosaichunter" />
+    <property name="packagedir" value="cn/edu/pku/cbi/mosaichunter" />
+    <property name="jarfilename" value="mosaichunter.jar" />
+    <property name="mainclass" value="${package}.MosaicHunter" />
+
+    <!-- DIRECTORY SETUP -->
+    <property name="srcdir" value="src" />
+    <property name="libdir" value="lib/" />
+    <property name="configdir" value="conf" />
+    <property name="builddir" value="build" />
+    <property name="build_classdir" value="${builddir}/classes" />
+
+    <property environment="env"/>
+
+    <property name="debug" value="off" />
+    <property name="verbose" value="no" />
+
+    <path id="classpath">
+        <fileset dir="${libdir}">
+          <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <target name="compile" depends="clean">
+        <mkdir dir="${build_classdir}"/>
+        <javac srcdir="${srcdir}" destdir="${build_classdir}" includes="${packagedir}/**" debug="true" verbose="${verbose}" includeantruntime="false">
+            <classpath refid="classpath" />
+        </javac>
+    </target>
+    <target name="jar" depends="compile">
+        <copy todir="${build_classdir}" overwrite="true"><fileset dir="${libdir}"/></copy>
+        <pathconvert property="mf.classpath" pathsep=" ">
+            <path refid="classpath" />
+            <flattenmapper />
+        </pathconvert>
+
+        <jar jarfile="${builddir}/${jarfilename}" basedir="${build_classdir}">
+            <manifest>
+                <attribute name="Main-Class" value="${mainclass}"/>
+                <attribute name="Class-Path" value="${mf.classpath} "/>
+            </manifest>
+        </jar>
+    </target>
+    <target name="onejar" depends="compile">
+        <one-jar destfile="${builddir}/${jarfilename}">
+            <manifest>
+                <attribute name="One-Jar-Main-Class" value="${mainclass}"/>
+            </manifest>
+            <main>
+                <fileset dir="${build_classdir}"/>
+            </main>
+            <lib>
+                <fileset dir="${libdir}" />
+            </lib>
+        </one-jar>
+    </target>
+    <target name="clean">
+        <delete dir="${builddir}"/>
+    </target>
+
+</project>
+                   
