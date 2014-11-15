@@ -2,6 +2,7 @@ sh/*
 log/*
 data/*
 tmp/*
+build/*
 
 # eclipse
 .classpath
@@ -13,7 +14,6 @@ tmp/*
 .mtj.tmp/
 
 # Package Files #
-*.jar
 *.war
 *.ear
 
