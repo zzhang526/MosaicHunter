@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter;
 import java.io.File;
+import java.io.IOException;
 import java.util.Random;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
@@ -35,7 +36,7 @@ public class BamSiteReader {
         this.random = new Random(seed);
     }
 
-    public void init() throws Exception {
+    public void init() throws IOException {
         input = new SAMFileReader(
                 new File(inputFile), 
                 indexFile == null || indexFile.isEmpty() ? null : new File(indexFile));
@@ -63,7 +64,7 @@ public class BamSiteReader {
         int cnt = 0;
 
         SAMRecord[] baseRecords = new SAMRecord[maxDepth + 1];
-        int[] basePos = new int[maxDepth + 1];
+        short[] basePos = new short[maxDepth + 1];
         byte[] bases = new byte[maxDepth + 1];
         byte[] baseQualities = new byte[maxDepth + 1];
         while (it.hasNext()) {
@@ -74,7 +75,7 @@ public class BamSiteReader {
             if (read.getMappingQuality() < minMappingQuality) {
                 continue;
             }
-            for (int i = 0; i < read.getReadLength(); ++i) {
+            for (short i = 0; i < read.getReadLength(); ++i) {
                 if (position == read.getReferencePositionAtReadPosition(i + 1)) {
                     if (read.getBaseQualities()[i] >= minReadQuality) {
                         cnt++;
@@ -100,6 +101,7 @@ public class BamSiteReader {
         FilterEntry filterEntry = new FilterEntry(
                          input,
                          null,
+                         null,
                          chr,
                          position,
                          (byte) Character.toUpperCase(refBase),
@@ -107,6 +109,7 @@ public class BamSiteReader {
                          bases,
                          baseQualities,
                          baseRecords,
+                         null,
                          basePos,
                          alleleOrder);           
         it.close();

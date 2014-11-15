@@ -1,8 +1,9 @@
 package cn.edu.pku.cbi.mosaichunter;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -29,7 +30,8 @@ public class BamScanner {
     private final String indexFile;    
     private final String referenceFile;    
     private final int maxDepth;
-    private final Filter filter;
+    private final int maxSites;
+    private final Filter inProcessFilter;
     private final Filter postProcessfilter;  
     private final long seed;
     private final boolean depthSampling;
@@ -42,36 +44,102 @@ public class BamScanner {
              FilterFactory.create(ConfigManager.getInstance().get(null, "in_process_filter_name", null)),
              FilterFactory.create(ConfigManager.getInstance().get(null, "post_process_filter_name", null)),
              ConfigManager.getInstance().getInt(null, "max_depth"),
+             ConfigManager.getInstance().getInt(null, "max_sites", 10000),
              ConfigManager.getInstance().getLong(null, "seed", System.currentTimeMillis()),
              ConfigManager.getInstance().getBoolean(null, "depth_sampling", false)
              );        
     }
     
     public BamScanner(String inputFile, String indexFile, String referenceFile, 
-            Filter inProcessFilter, Filter postProcessfilter, int maxDepth, long seed, boolean depthSampling) throws Exception {
+            Filter inProcessFilter, Filter postProcessfilter, int maxDepth, int maxSites, long seed, boolean depthSampling) throws Exception {
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.referenceFile = referenceFile;
-        this.filter = inProcessFilter;
+        this.inProcessFilter = inProcessFilter;
         this.postProcessfilter = postProcessfilter;
         this.maxDepth = maxDepth;
+        this.maxSites = maxSites;
         this.seed = seed;
         this.depthSampling = depthSampling;
         this.random = new Random(this.seed);
         
-        inProcessFilter.init();
-        postProcessfilter.init();
+       
     }
     
     public void scan() throws Exception  {       
         
-        BufferedReader referenceReader = new BufferedReader(new FileReader(referenceFile));
-        ReferenceScanner referenceScanner = new ReferenceScanner(referenceReader);
+        System.out.println(new Date() + " Initializing...");
+        
+        ArrayManager arrayManager = new ArrayManager(160, Math.max(160, maxDepth + 1));
+     
+        SAMFileReader samFileReader = new SAMFileReader(
+                new File(inputFile), 
+                indexFile == null ? null : new File(indexFile));
+        samFileReader.setValidationStringency(ValidationStringency.SILENT);
+     
+        ReferenceManager referenceManager = null;
+        if (ConfigManager.getInstance().getBoolean(null, "enable_reference_cache", false)) {
+            String od = ConfigManager.getInstance().get(null, "output_dir", ".");
+            File cacheFile = new File(od, new File(referenceFile + ".cache").getName());
+            System.out.println(new Date() + " Reading reference from cache file: " + cacheFile.getAbsolutePath());
+            if (cacheFile.isFile()) {
+                ObjectInputStream ois = null;
+                try {
+                    FileInputStream fis = new FileInputStream(cacheFile);
+                    ois = new ObjectInputStream(fis);
+                    referenceManager = (ReferenceManager) ois.readObject();
+                    ois.close();
+                } catch (Exception e) {
+                    System.out.println(new Date() + " Cannot read cache file: " + cacheFile.getAbsolutePath() + " " + e.getMessage());
+                } finally {
+                    if (ois != null) {
+                        try {
+                            ois.close();
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            }
+            
+            if (referenceManager == null) {
+                System.out.println(new Date() + " Reading reference from file: " + referenceFile);
+                referenceManager = new ReferenceManager(referenceFile);
+                System.out.println(new Date() + " Writing reference to cache file: " + cacheFile.getAbsolutePath());
+                ObjectOutputStream oos = null;
+                try {
+                    FileOutputStream fos = new FileOutputStream(cacheFile);
+                    oos = new ObjectOutputStream(fos);
+                    oos.writeObject(referenceManager);
+                    oos.close(); 
+                } catch (Exception e) {
+                    System.out.println(new Date() + " Cannot write cache file: " + cacheFile.getAbsolutePath() + " " + e.getMessage());
+                    e.printStackTrace();
+                    
+                } finally {
+                    if (oos != null) {
+                        try {
+                            oos.close();
+                        } catch (Exception e) {
+                        }
+                    }
+                }
+            }
+        } else {
+            System.out.println(new Date() + " Reading reference from file: " + referenceFile);
+            referenceManager = new ReferenceManager(referenceFile);
+        }
+        
+        
+        System.out.println(new Date() + " Initiazing filters...");
+        inProcessFilter.init();
+        postProcessfilter.init();
+        
+        
+        // scan
         
         SAMFileReader input = new SAMFileReader(
                 new File(inputFile), 
                 indexFile == null ? null : new File(indexFile));
-     
         input.setValidationStringency(ValidationStringency.SILENT);
         
         SAMFileHeader h = input.getFileHeader();
@@ -89,6 +157,8 @@ public class BamScanner {
         long processedSites = 0;
         long totalSites = 0;
         long startTime = System.currentTimeMillis();
+        long depthSum = 0;
+        long depthCount = 0;
         
         ConfigManager config = ConfigManager.getInstance();
         int minReadQuality = config.getInt(null, "min_read_quality", 0);
@@ -105,6 +175,7 @@ public class BamScanner {
             int chrId = MosaicHunterHelper.getChrId(chr);
             if (chrId <= 0) {
                 input.close();
+                samFileReader.close();
                 throw new Exception("invalid chr parameter");
             }
             int startPosition = config.getInt(null, "start_position", 1);
@@ -135,6 +206,8 @@ public class BamScanner {
         
         List<FilterEntry> filterEntries = new ArrayList<FilterEntry>();
         
+        System.out.println(new Date() + " Scanning...");
+
         StatsManager.start("in_process");
         
         System.out.println(
@@ -150,12 +223,10 @@ public class BamScanner {
             SAMRecordIterator it = null;
             if (region == null) {
                 it = input.iterator();
-       
             } else {
                 it = input.queryOverlapping(region.getChr(), region.getStart(), region.getEnd()); 
                 startPosition = region.getStart();
                 endPosition = region.getEnd();   
-                //System.out.println(region.getChr() + " " + startPosition + " " + endPosition + " " + processedEntries);
             }
             
             String lastRefName = null;
@@ -164,7 +235,7 @@ public class BamScanner {
             LinkedList<ScanEntry> scanEntries = new LinkedList<ScanEntry>();
             SAMRecordIteratorBuffer itBuffer = new SAMRecordIteratorBuffer(
                     it, ConfigManager.getInstance().getInt(null, "read_buffer_size" , 100000), readCache);
-            
+          
             while (true) {
                 ScanEntry currentEntry = null;
                 while (itBuffer.hasNext() && currentEntry == null) {
@@ -178,7 +249,8 @@ public class BamScanner {
                                 " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
                                 " Reads:" + processedEntries +
                                 " Sites:" + done + "/" + totalSites + 
-                                " Progress:" + String.format("%.2f", progress) + "%");
+                                " Progress:" + String.format("%.2f", progress) + "%" + 
+                                " " + lastRefName + ":" + lastRefPos);
                     }
                     if (next.getDuplicateReadFlag()) {
                         continue;
@@ -199,14 +271,19 @@ public class BamScanner {
                 if (currentEntry != null && currentEntry.chr.equals(lastRefName)) {
                     currentRefPos = currentEntry.record.getAlignmentStart();
                 } 
+                
                 for (long pos = lastRefPos; pos < currentRefPos && !scanEntries.isEmpty(); ++pos) {
                     int depth = 0;
                     int cnt = 0;
-                    int currentDepth = 150;
-                    SAMRecord[] baseRecords = new SAMRecord[currentDepth];
-                    int[] basePos = new int[currentDepth];
-                    byte[] bases = new byte[currentDepth];
-                    byte[] baseQualities = new byte[currentDepth];
+                    int currentDepth = (int)(depthSum / (depthCount + 1) * 2);
+                    currentDepth = Math.max(currentDepth, 100);
+                    currentDepth = Math.min(currentDepth, maxDepth + 1);
+                    
+                    SAMRecord[] reads = arrayManager.getSAMRecordArray(currentDepth);
+                    short[] basePos = arrayManager.getShortArray(currentDepth);
+                    byte[] bases = arrayManager.getByteArray(currentDepth);
+                    byte[] baseQualities = arrayManager.getByteArray(currentDepth);
+                    currentDepth = baseQualities.length;
                     
                     for (Iterator<ScanEntry> it2 = scanEntries.iterator(); it2.hasNext();) {                                              
                         ScanEntry entry = it2.next();
@@ -222,27 +299,32 @@ public class BamScanner {
                         if (block == null) {
                             it2.remove();
                         } else if (pos >= block.getReferenceStart()) {
-                            int p = (int) (pos - block.getReferenceStart() + block.getReadStart() - 1);
+                            short p = (short) (pos - block.getReferenceStart() + block.getReadStart() - 1);
                             byte quality = entry.record.getBaseQualities()[p];
                             if (quality >= minReadQuality) {
                                 cnt++;
                                 if (depth >= currentDepth) {
-                                    currentDepth *= 2;
-                                    if (currentDepth > maxDepth + 1) {
-                                        currentDepth = maxDepth + 1;
-                                    }
-                                    SAMRecord[] newBaseRecords = new SAMRecord[currentDepth];
-                                    int[] newBasePos = new int[currentDepth];
-                                    byte[] newBases = new byte[currentDepth];
-                                    byte[] newBaseQualities = new byte[currentDepth];
-                                    System.arraycopy(baseRecords, 0, newBaseRecords, 0, depth);
+                                    SAMRecord[] newReads = arrayManager.getSAMRecordArray(currentDepth + 1);
+                                    short[] newBasePos = arrayManager.getShortArray(currentDepth + 1);
+                                    byte[] newBases = arrayManager.getByteArray(currentDepth + 1);
+                                    byte[] newBaseQualities = arrayManager.getByteArray(currentDepth + 1);
+                                    currentDepth = newBaseQualities.length;
+                                    
+                                    System.arraycopy(reads, 0, newReads, 0, depth);
                                     System.arraycopy(basePos, 0, newBasePos, 0, depth);
                                     System.arraycopy(bases, 0, newBases, 0, depth);
                                     System.arraycopy(baseQualities, 0, newBaseQualities, 0, depth);
-                                    baseRecords = newBaseRecords;
+                                    
+                                    arrayManager.returnSAMRecordArray(reads);
+                                    arrayManager.returnShortArray(basePos);
+                                    arrayManager.returnByteArray(bases);
+                                    arrayManager.returnByteArray(baseQualities);
+                                    
+                                    reads = newReads;
                                     basePos = newBasePos;
                                     bases = newBases;
                                     baseQualities = newBaseQualities;
+                                    
                                     StatsManager.count("depth_array_expand");
                                 }
                                 int ii = -1;
@@ -253,7 +335,7 @@ public class BamScanner {
                                     ii = random.nextInt(maxDepth);
                                 }
                                 if (ii >= 0) {
-                                    baseRecords[ii] = entry.record;
+                                    reads[ii] = entry.record;
                                     basePos[ii] = p;
                                     bases[ii] = entry.record.getReadBases()[p];
                                     baseQualities[ii] = quality;
@@ -262,28 +344,43 @@ public class BamScanner {
                         }
                     }  
                     
+                    depthSum += depth;
+                    depthCount++;
+                    
                     if (depth > 0 && pos >= startPosition && pos <= endPosition) {
-                        byte refBase = referenceScanner.getBaseAt(lastRefName, pos);
-                        if (refBase != 0) {
+                        //byte refBase = referenceScanner.getBaseAt(lastRefName, pos);
+                        byte refBase = referenceManager.getBase(lastRefName, (int) pos);
+                        
+                        if (refBase != 0 && refBase != 'N') {
                             refBase = (byte) Character.toUpperCase(refBase);
                             FilterEntry filterEntry = new FilterEntry(
-                                    input,
+                                    samFileReader,
                                     readCache,
+                                    referenceManager,
                                     lastRefName,
                                     pos,
                                     refBase,
                                     depth,
                                     bases,
                                     baseQualities,
-                                    baseRecords,
+                                    reads,
+                                    null,
                                     basePos);
                             
-                            if (filter.filter(filterEntry)) {
-                                // TODO limit size?
-                                filterEntries.add(filterEntry);                            
+                            if (filterEntries.size() < maxSites && inProcessFilter.filter(filterEntry)) {
+                                filterEntries.add(filterEntry);   
+                                reads = null;
+                                basePos = null;
+                                bases = null;
+                                baseQualities = null;
                             }
                         }
-                    }                     
+                    }                    
+                    arrayManager.returnSAMRecordArray(reads);
+                    arrayManager.returnShortArray(basePos);
+                    arrayManager.returnByteArray(bases);
+                    arrayManager.returnByteArray(baseQualities);
+                    
                 }
                 
                 if (currentEntry == null) {
@@ -292,12 +389,18 @@ public class BamScanner {
                 if (currentEntry.chr.equals(lastRefName)) {
                     lastRefPos = currentRefPos;
                 } else {
+                    if (region == null) {
+                        // TODO: should be chr length
+                        processedSites += lastRefPos + 1;
+                    }
                     lastRefName = currentEntry.chr;
                     lastRefPos = currentEntry.record.getAlignmentStart();
                 }            
                 scanEntries.add(currentEntry);
             }  
-            processedSites += endPosition - startPosition + 1;
+            if (region != null) {
+                processedSites += endPosition - startPosition + 1;
+            }
             it.close();
         }
         System.out.println(
@@ -310,28 +413,30 @@ public class BamScanner {
         StatsManager.end("in_process");
         
         StatsManager.start("post_process");
-        filterEntries = postProcessfilter.filter(filterEntries);
+        postProcessfilter.filter(filterEntries);
         StatsManager.end("post_process");
         
-        filter.printStats(true);
+        for (FilterEntry filterEntry : filterEntries) {
+            arrayManager.returnSAMRecordArray(filterEntry.getReads());
+            arrayManager.returnShortArray(filterEntry.getBasePos());
+            arrayManager.returnByteArray(filterEntry.getBases());
+            arrayManager.returnByteArray(filterEntry.getBaseQualities());
+        }
+        
+        inProcessFilter.printStats(true);
         postProcessfilter.printStats(false);
         
         input.close();
-        referenceReader.close();
-    }
-
-    public void close() throws Exception {
-        filter.close();
+        samFileReader.close();
+        inProcessFilter.close();
         postProcessfilter.close();
     }
     
-   
     private static class ScanEntry {
         private String chr;
         private SAMRecord record;
         private LinkedList<AlignmentBlock> alignmentBlocks;
     }
-    
     
     private class SAMRecordIteratorBuffer {
         
@@ -385,67 +490,5 @@ public class BamScanner {
         }
     }
     
-    private class ReferenceScanner {
-        private final BufferedReader reader;
-        private String currentName = null;
-        private int currentChrId = 0;
-        private long currentPos = 1;
-        private String currentLine = "";
-        private boolean done = false;
-        
-        public ReferenceScanner(BufferedReader reader) {
-            this.reader = reader;
-        }
-        
-        public byte getBaseAt(String chrName, long pos) throws IOException {
-            int chrId = MosaicHunterHelper.getChrId(chrName);
-            while (currentChrId < chrId && !done) {
-                nextLine();
-            }
-            if (done || currentChrId != chrId || pos < currentPos) {
-                return 0;
-            }
-            
-            while (pos >= currentPos + currentLine.length() && 
-                   currentChrId == chrId &&
-                   !done) {
-                nextLine();
-            }
-            if (done || currentChrId != chrId) {
-                return 0;
-            }            
-            return (byte) currentLine.charAt((int) (pos - currentPos));
-        }
-        
-        private void nextLine() throws IOException {
-            for (;;) {
-                String line = reader.readLine();
-                if (line == null) {
-                    done = true;
-                    return;
-                }
-                if (line.isEmpty()) {
-                    continue;
-                }
-                if (line.startsWith(">")) {
-                    currentName = line.substring(1).trim();
-                    int p = currentName.indexOf(' ');
-                    if (p >= 0) {
-                        currentName = currentName.substring(0, p);
-                    }
-                    if (currentName.startsWith("chr")) {
-                        currentName = currentName.substring(3);
-                    }
-                    currentChrId = MosaicHunterHelper.getChrId(currentName);
-                    currentPos = 1;
-                    currentLine = "";
-                    continue;
-                }
-                currentPos += currentLine.length();
-                currentLine = line;
-                break;
-            }
-        }
-    }
 }
 

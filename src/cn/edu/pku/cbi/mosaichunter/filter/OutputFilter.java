@@ -18,7 +18,6 @@ public class OutputFilter extends BaseFilter {
        
     @Override
     public boolean doFilter(FilterEntry filterEntry) {  
-        System.out.println(filterEntry.getDepth() + " " + filterEntry.getMajorAlleleCount() + " " + filterEntry.getMinorAlleleCount());
         return true;
     }
     

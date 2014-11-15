@@ -13,12 +13,10 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
-import cn.edu.pku.cbi.mosaichunter.filter.MosaicFilter;
 
 public class MosaicHunter {
    
     public static void main(String[] args) throws Exception {
-            
         if (args.length == 0) {
             args = new String[] {"-C", "conf/default.properties"};
         }
@@ -29,17 +27,19 @@ public class MosaicHunter {
         
         BamScanner scanner = new BamScanner();
         scanner.scan();
-        scanner.close();
         
         StatsManager.printStats();
         
         // TODO
-        for (int i = 0; i < MosaicFilter.cnt.length; ++i) {
+        /*
+           for (int i = 0; i < MosaicFilter.cnt.length; ++i) {
+         
             long a = MosaicFilter.cnt[i];
             if (a > 0) {
                 System.out.println(i + " " + a);
             }
         }
+*/
         
     }
     

@@ -14,7 +14,6 @@ public class CompleteLinkageFilter extends BaseFilter {
     public static final double DEFAULT_MIN_P_VALUE = 0.01;
     
     private final double minPValue;
-    private final Map<String, SAMRecord> mates = new HashMap<String, SAMRecord>();
     
     public CompleteLinkageFilter(String name) {
         this(name,
@@ -25,22 +24,24 @@ public class CompleteLinkageFilter extends BaseFilter {
         super(name);
         this.minPValue = minPValue;        
     }   
-    
-    
-    public static int[] cnt = new int[999];
-    
+        
     @Override
     public boolean doFilter(FilterEntry filterEntry) {  
-        if (filterEntry.getPassedFilters().contains("mosaic_like_filter")) {
-            return true;
-        }
+        
         SAMRecord[] reads = filterEntry.getReads();
         if (!doFilter(filterEntry, reads)) {
             return false;
         }
         
         SAMRecord[] mates = filterEntry.getMates();
+        if (mates == null) {
+            mates = new SAMRecord[filterEntry.getDepth()];
+            filterEntry.setMates(mates);
+        }
         for (int i = 0; i < mates.length; ++i) {
+            if (mates[i] == null) {
+                mates[i] = filterEntry.getReadCache().getMate(reads[i]);
+            }
             StatsManager.count("mate_query");
             if (reads[i].getMateUnmappedFlag()) {
                 StatsManager.count("mate_unmapped");
@@ -49,9 +50,15 @@ public class CompleteLinkageFilter extends BaseFilter {
                 }
             } else if (mates[i] == null) {
                 StatsManager.count("mate_miss", 1);
-                SAMRecord m =this.getMate(filterEntry, reads[i]);
+                SAMRecord m = filterEntry.getSAMFileReader().queryMate(reads[i]);
                 if (m != null && m.getAlignmentStart() != reads[i].getAlignmentStart()) {
+                    mates[i] = m;
                     StatsManager.count("mate_miss_true", 1);
+                    /*
+                    System.out.println(filterEntry.getChrName() + " " + filterEntry.getRefPos());
+                    System.out.println(reads[i].getMateAlignmentStart() + " " + reads[i].getAlignmentStart());
+                    System.out.println(mates[i].getMateAlignmentStart() + " " + mates[i].getAlignmentStart());
+                    */
                 }
                 int dis = Math.abs(reads[i].getMateAlignmentStart() - reads[i].getAlignmentStart());
                 if (dis > 0) {
@@ -74,19 +81,6 @@ public class CompleteLinkageFilter extends BaseFilter {
                 
             }
         }
-        //SAMRecord[] mates = new SAMRecord[filterEntry.getDepth()];
-        /*
-        StatsManager.start("linakge");
-        for (int i = 0; i < mates.length; ++i) {
-            StatsManager.count("mate_query", 1);
-            if (mates[i] == null) {
-                StatsManager.count("mate_miss", 1);
-                mates[i] = getMate(filterEntry, reads[i]);
-            }
-             
-        }
-        StatsManager.end("linakge");
-        */
         
         boolean result = doFilter(filterEntry, mates);
         return result;
@@ -174,17 +168,6 @@ public class CompleteLinkageFilter extends BaseFilter {
             
         }     
         return true;
-    }
-    
-    private SAMRecord getMate(FilterEntry filterEntry, SAMRecord read) {
-        String key = read.getReadName();
-        if (mates.containsKey(key)) {
-            //return mates.get(key);
-        }
-        
-        SAMRecord mate = filterEntry.getSAMFileReader().queryMate(read);
-        mates.put(key, mate);
-        return mate;
     }
     
     private class PositionEntry {

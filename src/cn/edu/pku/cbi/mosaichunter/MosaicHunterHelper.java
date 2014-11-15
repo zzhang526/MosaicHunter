@@ -63,6 +63,26 @@ public class MosaicHunterHelper {
         return ids;
     }    
     
+    public static List<String[]> readTsvFile(String tsvFile) throws IOException {
+        BufferedReader reader = null; 
+        List<String[]> ret = new ArrayList<String[]>();
+        try {
+            reader = new BufferedReader(new FileReader(tsvFile));
+            for (;;) {
+               String line = reader.readLine();
+               if (line == null) {
+                   break;
+               }
+               String[] tokens = line.split("\\t");
+               ret.add(tokens);
+            }
+        } finally {
+            if (reader != null) {
+                reader.close();
+            }
+        }  
+        return ret;
+    }
     public static List<Region> readBedFile(String bedFile) throws IOException {
         if (bedFile == null || bedFile.trim().isEmpty()) {
             return new ArrayList<Region>();

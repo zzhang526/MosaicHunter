@@ -7,6 +7,7 @@ import java.util.Set;
 
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
 import cn.edu.pku.cbi.mosaichunter.ReadCache;
+import cn.edu.pku.cbi.mosaichunter.ReferenceManager;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 
@@ -16,6 +17,7 @@ public class FilterEntry {
     
     private final SAMFileReader samFileReader;
     private final ReadCache readCache;
+    private final ReferenceManager referenceManager;
     
     private final String chrName;
     private final long refPos;
@@ -24,14 +26,14 @@ public class FilterEntry {
     private final byte[] bases;
     private final byte[] baseQualities;
     private final SAMRecord[] reads;
-    private final SAMRecord[] mates;
-    private final int[] basePos;
+    private final short[] basePos;
     private final Map<String, Object[]> metadata = new HashMap<String, Object[]>(); 
     private final Set<String> passedFilters = new HashSet<String>();
     private final String alleleIdOrder;
     private final int[] alleleId;
     private final int[] alleleCount = new int[4];
     
+    private SAMRecord[] mates;
     
     private byte majorAllele = -1;
     private byte minorAllele = -1;
@@ -39,39 +41,44 @@ public class FilterEntry {
     private int minorAlleleId = -1;
     private int majorAlleleCount = -1;
     private int minorAlleleCount = -1;
+    private int positiveAlleleCount = -1;    
     private int positiveMajorAlleleCount = -1;    
     private int positiveMinorAlleleCount = -1;
+    private int negativeAlleleCount = -1;
     private int negativeMajorAlleleCount = -1;    
     private int negativeMinorAlleleCount = -1;
+    
     private String alleleCountOrder;
 
     
-    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache,
+    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache, ReferenceManager referenceManager,
             String chrName, long refPos, byte ref, int depth,
-            byte[] bases, byte[] baseQualities, SAMRecord[] reads, int[] basePos) {
-        this(samFileReader, readCache, chrName, refPos, ref, depth, bases, baseQualities, reads, 
+            byte[] bases, byte[] baseQualities, SAMRecord[] reads, SAMRecord[] mates, short[] basePos) {
+        this(samFileReader, readCache, referenceManager,
+             chrName, refPos, ref, depth, bases, baseQualities, reads, mates,
              basePos, DEFAULT_ALLELE_ID_ORDER);
     }
     
-    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache,
+    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache, ReferenceManager referenceManager,
             String chrName, long refPos, byte ref, int depth,
-            byte[] bases, byte[] baseQualities, SAMRecord[] baseRecords, int[] basePos,
+            byte[] bases, byte[] baseQualities, SAMRecord[] baseRecords, SAMRecord[] mates, short[] basePos,
             String alleleIdOrder) {
         this.samFileReader = samFileReader;
         this.readCache = readCache;
+        this.referenceManager = referenceManager;
         this.chrName = chrName;
         this.refPos = refPos;
         this.ref = ref;
         this.depth = depth;
         this.bases = bases;
+        this.mates = mates;
         this.baseQualities = baseQualities;
         this.reads = baseRecords;
-        this.mates = new SAMRecord[depth];
         this.basePos = basePos;
-        this.alleleIdOrder = alleleIdOrder;
+        this.alleleIdOrder = alleleIdOrder == null ? DEFAULT_ALLELE_ID_ORDER : alleleIdOrder;
         alleleId = new int[128];
-        for (int i = 0; i < alleleIdOrder.length(); ++i) {
-            alleleId[alleleIdOrder.charAt(i)] = i;
+        for (int i = 0; i < this.alleleIdOrder.length(); ++i) {
+            alleleId[this.alleleIdOrder.charAt(i)] = i;
         }
     }
     
@@ -81,6 +88,10 @@ public class FilterEntry {
     
     public ReadCache getReadCache() {
         return readCache;
+    }
+    
+    public ReferenceManager getReferenceManager() {
+        return referenceManager;
     }
     
     public String getChrName() {
@@ -115,7 +126,11 @@ public class FilterEntry {
         return mates;
     }
     
-    public int[] getBasePos() {
+    public void setMates(SAMRecord[] mates) {
+        this.mates = mates;
+    }
+    
+    public short[] getBasePos() {
         return basePos;
     }
     
@@ -179,7 +194,14 @@ public class FilterEntry {
         }
         return alleleCount[alleleId[allele]];
     }
-   
+
+    public int getPositiveAlleleCount() {
+        if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
+        return positiveAlleleCount;
+    }
+    
     public int getPositiveMajorAlleleCount() {
         if (majorAllele < 0) {
             calculateAlleleCounts();
@@ -193,7 +215,14 @@ public class FilterEntry {
         }
         return positiveMinorAlleleCount;
     }
-
+    
+    public int getNegativeAlleleCount() {
+        if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
+        return negativeAlleleCount;
+    }
+    
     public int getNegativeMajorAlleleCount() {
         if (majorAllele < 0) {
             calculateAlleleCounts();
@@ -216,12 +245,18 @@ public class FilterEntry {
     }
     
     private void calculateAlleleCounts() {        
-        int[] negativeAlleleCount = new int[4];
+        int[] negativeAlleleCounts = new int[4];
 
+        positiveAlleleCount = 0;
+        negativeAlleleCount = 0;
+        
         for (int i = 0; i < depth; ++i) { 
             alleleCount[alleleId[bases[i]]]++;
             if (reads[i].getReadNegativeStrandFlag()) {
-                negativeAlleleCount[alleleId[bases[i]]]++;
+                negativeAlleleCounts[alleleId[bases[i]]]++;
+                negativeAlleleCount++;
+            } else {
+                positiveAlleleCount++;
             }
         }
         int[] allele = new int[] {0, 1, 2, 3};
@@ -244,10 +279,11 @@ public class FilterEntry {
 
         majorAlleleCount = alleleCount[allele[0]];
         minorAlleleCount = alleleCount[allele[1]];;
-        negativeMajorAlleleCount = negativeAlleleCount[allele[0]];  
-        negativeMinorAlleleCount = negativeAlleleCount[allele[1]];
-        positiveMajorAlleleCount = alleleCount[allele[0]] - negativeAlleleCount[allele[0]];    
-        positiveMinorAlleleCount = alleleCount[allele[1]] - negativeAlleleCount[allele[1]];
+        negativeMajorAlleleCount = negativeAlleleCounts[allele[0]];  
+        negativeMinorAlleleCount = negativeAlleleCounts[allele[1]];
+        positiveMajorAlleleCount = alleleCount[allele[0]] - negativeAlleleCounts[allele[0]];    
+        positiveMinorAlleleCount = alleleCount[allele[1]] - negativeAlleleCounts[allele[1]];
+        
         alleleCountOrder = "" + 
                 alleleIdOrder.charAt(allele[0]) + 
                 alleleIdOrder.charAt(allele[1]) + 

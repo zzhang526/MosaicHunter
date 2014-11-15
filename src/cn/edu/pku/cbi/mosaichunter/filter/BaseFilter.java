@@ -5,10 +5,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import cn.edu.pku.cbi.mosaichunter.StatsManager;
@@ -79,6 +77,9 @@ abstract public class BaseFilter implements Filter {
         }
     }
     
+    public String getOutputDir() {
+        return outputDir;
+    }
     
     public boolean filter(FilterEntry filterEntry) {
         StatsManager.start(name);
@@ -152,8 +153,14 @@ abstract public class BaseFilter implements Filter {
         sb.append(filterEntry.getRefPos()).append('\t');
         sb.append((char) filterEntry.getRef()).append('\t');
         sb.append(filterEntry.getDepth()).append('\t');
-        sb.append(new String(filterEntry.getBases(), 0, filterEntry.getDepth())).append('\t');
-       
+        for (int i = 0; i < filterEntry.getDepth(); ++i) {
+            char base = (char) filterEntry.getBases()[i];
+            if (filterEntry.getReads()[i].getReadNegativeStrandFlag()) {
+                base = Character.toLowerCase(base);
+            }
+            sb.append(base);
+        }
+        sb.append('\t');
         
         for (int i = 0; i < filterEntry.getDepth(); ++i) {
             sb.append((char) (filterEntry.getBaseQualities()[i] + 33));

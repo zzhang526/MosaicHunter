@@ -5,6 +5,9 @@ import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 public class FilterFactory {
 
     public static Filter create(String name) throws Exception {
+        if (name == null) {
+            throw new IllegalArgumentException("filter name is null.");
+        }
         String className = ConfigManager.getInstance().get(name, "class");
         if (className == null || className.trim().isEmpty()) {
             throw new Exception(name + ".class property is missing");

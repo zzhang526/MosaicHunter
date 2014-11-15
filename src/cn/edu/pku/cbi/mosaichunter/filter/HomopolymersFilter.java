@@ -1,9 +1,5 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
-import java.io.IOException;
-
-import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
-import cn.edu.pku.cbi.mosaichunter.ReferenceReader;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class HomopolymersFilter extends BaseFilter {
@@ -17,18 +13,6 @@ public class HomopolymersFilter extends BaseFilter {
     private final int longHomopolymerLength;
     private final int shortHomopolymerExpansion;
     private final int longHomopolymerExpansion;
-    private final String referenceFile;
-    private ReferenceReader reader;
-    
-    private boolean done = false;
-    private int currentChrId = 0;
-    private String currentChr = "";
-    private int currentRangeStart = 0;
-    private int currentRangeEnd = 0;
-    private byte currentRangeBase = 0;
-    private int currentRangeLength = 0;
-    private ReferenceReader.Entry lastEntry = null;
-    private int lastBaseCount = 0;
     
     public HomopolymersFilter(String name) {
         this(name,
@@ -47,7 +31,6 @@ public class HomopolymersFilter extends BaseFilter {
             int shortHomopolymerLength, int longHomopolymerLength, 
             int shortHomopolymerExpansion, int longHomopolymerExpansion) {
         super(name);
-        this.referenceFile = referenceFile;
         this.shortHomopolymerLength = shortHomopolymerLength;
         this.longHomopolymerLength = longHomopolymerLength;
         this.shortHomopolymerExpansion = shortHomopolymerExpansion;
@@ -55,83 +38,35 @@ public class HomopolymersFilter extends BaseFilter {
     }
     
     @Override
-    public void init() throws Exception {
-        super.init();
-        reader = new ReferenceReader(referenceFile);                   
-    }
-    
-    @Override
-    public void close() throws Exception {
-        reader.close();
-    }
-    
-    @Override
-    public boolean doFilter(FilterEntry filterEntry) {      
-        if (done) {
-            return false;
+    public boolean doFilter(FilterEntry filterEntry) {   
+        
+        long pos = filterEntry.getRefPos();
+        int width = Math.max(
+                longHomopolymerLength + longHomopolymerExpansion, 
+                shortHomopolymerLength + shortHomopolymerExpansion);
+        
+        long left = filterEntry.getRefPos() - width + 1;
+        long right = filterEntry.getRefPos() + width - 1;
+        byte lastBase = 'N';
+        int cnt = 0;
+        for (long i = left; i <= right + 1; ++i) {
+            byte base = filterEntry.getReferenceManager().getBase(
+                    filterEntry.getChrName(), i);
+            if (base == 'N' || base != lastBase || i == right + 1) {
+                if ((cnt >= longHomopolymerLength && 
+                     (i - cnt - longHomopolymerExpansion <= pos && i - 1 + longHomopolymerExpansion >= pos)) || 
+                    (cnt >= shortHomopolymerLength && 
+                     (i - cnt - shortHomopolymerExpansion <= pos && i - 1 + shortHomopolymerExpansion >= pos))) {
+                    return false;
+                } 
+                cnt = 0;
+            }
+            if (base != 'N') {
+                cnt++;
+            }
+            lastBase = base;
         }
-        int chrId = MosaicHunterHelper.getChrId(filterEntry.getChrName());
-        boolean validRange = true;
-        while (!done && chrId > currentChrId) {
-            validRange = nextRange();
-        }                
-        while (!done && chrId == currentChrId && filterEntry.getRefPos() > currentRangeEnd) {
-            validRange = nextRange();
-        }
-        if (!done && validRange && chrId == currentChrId &&
-            filterEntry.getRefPos() >= currentRangeStart &&
-            filterEntry.getRefPos() <= currentRangeEnd) {
-            filterEntry.setMetadata(
-                    getName(),
-                    new Object[] {
-                        currentChr, 
-                        currentRangeStart, 
-                        currentRangeEnd, 
-                        (char) currentRangeBase,
-                        currentRangeLength});
-            return false;
-        }
+        
         return true;
     }
-    
-    private boolean nextRange() {
-        for (;;) {
-            ReferenceReader.Entry entry = null;
-            try {
-                 entry = reader.next();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            if (entry != null && 
-                (entry.getChrId() == 0 || entry.getBase() == 'N' || entry.getBase() == 'n')) {
-                continue;
-            }
-            if (entry == null) {
-                done = true;
-            }
-            if (entry == null || lastEntry == null ||
-                entry.getChrId() != lastEntry.getChrId() || entry.getBase() != lastEntry.getBase()) {
-                if (lastBaseCount >= shortHomopolymerLength) {
-                    int expansion = lastBaseCount < longHomopolymerLength ?
-                            shortHomopolymerExpansion : longHomopolymerExpansion;
-                    currentChr = lastEntry.getChr();
-                    currentRangeStart = lastEntry.getPosition() - expansion;
-                    currentRangeEnd = lastEntry.getPosition() + lastBaseCount - 1 + expansion;
-                    currentChrId = lastEntry.getChrId();
-                    currentRangeBase = lastEntry.getBase();
-                    currentRangeLength = lastBaseCount;
-                    lastBaseCount = 1;
-                    lastEntry = entry; 
-                    return true;
-                } 
-                lastBaseCount = 1;
-                lastEntry = entry; 
-                if (entry == null) {
-                    return false;
-                }                
-            } else {
-                lastBaseCount++;
-            }
-        }
-    }    
 }

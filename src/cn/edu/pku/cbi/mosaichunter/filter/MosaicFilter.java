@@ -3,6 +3,7 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Date;
 
 import cn.edu.pku.cbi.mosaichunter.BamSiteReader;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
@@ -250,13 +251,7 @@ public class MosaicFilter extends BaseFilter {
                     calcTrioMosaic(filterEntry) : calcIndividualMosaic(filterEntry);
             pass = mosaic > mosaicThreshold;
         }
-        if (pass) {
-            // cache the mates
-            for (int i = 0; i < filterEntry.getDepth(); ++i) {
-                filterEntry.getMates()[i] = 
-                        filterEntry.getReadCache().getMate(filterEntry.getReads()[i]);
-            }
-        }
+        
         return pass;
         
     }
@@ -392,7 +387,6 @@ public class MosaicFilter extends BaseFilter {
     }
     
     private double calcTrioMosaic(FilterEntry child) {
-        
         FilterEntry father;
         try {
             father = fatherSiteReader.read(
@@ -405,9 +399,11 @@ public class MosaicFilter extends BaseFilter {
         
         FilterEntry mother;
         try {
+
             mother = motherSiteReader.read(
                     child.getChrName(), child.getRefPos(), child.getRef(),
                     child.getAlleleCountOrder());
+
         } catch (Exception e) {
             cnt[102]++;
             return -1;
@@ -444,6 +440,7 @@ public class MosaicFilter extends BaseFilter {
                 af, af, father, "M", father.getMajorAlleleId(), father.getMinorAlleleId());
         double[] motherPrior = calcPrior(
                 af, af, mother, "F", mother.getMajorAlleleId(), mother.getMinorAlleleId());
+
         if (motherPrior == null) {
             cnt[106]++;
             motherPrior = new double[] {0, 0, 0 ,0};
@@ -451,13 +448,13 @@ public class MosaicFilter extends BaseFilter {
         print10(fatherPrior, "father prior");
         print10(motherPrior, "mother prior");
 
-        
         double[] fatherLikelihood = calcLikelihood(
                 father, father.getMajorAlleleId(), father.getMinorAlleleId());
         double[] motherLikelihood = calcLikelihood(
                 mother, mother.getMajorAlleleId(), mother.getMinorAlleleId());
         double[] childLikelihood = calcLikelihood(
                 child, child.getMajorAlleleId(), child.getMinorAlleleId());
+        
         print10(fatherLikelihood, "father like");
         print10(motherLikelihood, "mother like");
         print10(childLikelihood, "child like");
@@ -467,8 +464,6 @@ public class MosaicFilter extends BaseFilter {
             cnt[107]++;
             return -1;
         }
-        
-
         
         double sum = LOGZERO;
         double[][][] joint = new double[4][4][4];
