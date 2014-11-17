@@ -39,6 +39,7 @@ public class WithinReadPositionFilter extends BaseFilter {
                 i2++;
             }
         }
+        
         double p = WilcoxonRankSumTest.twoSided(majorAllelePositions, minorAllelePositions);
         filterEntry.setMetadata(
                 getName(),

@@ -75,9 +75,6 @@ public class ExomeParameterFilter extends BaseFilter {
         filterEntry.setMetadata(
                 getName(),
                 new Object[] {altAf});
-        
-        //2       241810777       G       A       21      4       1.41603 0.03888 75.01572        1.32555 25
-
         StringBuilder sb = new StringBuilder();
         sb.append(filterEntry.getChrName()).append('\t')
           .append(filterEntry.getRefPos()).append('\t')
@@ -107,7 +104,7 @@ public class ExomeParameterFilter extends BaseFilter {
         
         //in = "data/exome_parameter_filter.passed.tsv";
         //in = "data/shu_family.64.s7.tsv";
-        
+      
         if (in != null) {
             sites.clear();
             List<String[]> f = null;
@@ -146,13 +143,16 @@ public class ExomeParameterFilter extends BaseFilter {
                 }
             }
         });
+
         
         int n = sites.size();
         int[] depth = new int[n];
+        long totalDepth = 0;
         double[] af = new double[n];
         for (int i = 0; i < n; ++i) {
             depth[i] = sites.get(i).depth;
             af[i] = sites.get(i).altAf;  
+            totalDepth += depth[i];
         }
         
         int maxGroups = n / minGroupSize + 2;
@@ -212,6 +212,8 @@ public class ExomeParameterFilter extends BaseFilter {
         //System.out.println("alpha: " + alpha);
         //System.out.println("beta: " + beta);
         
+        long averageDepth = n == 0 ? 0 : totalDepth / n;
+        System.out.println("average depth: " + averageDepth);
         System.out.println("alpha: " + Math.round(alpha));
         System.out.println("beta: " + Math.round(beta));
         

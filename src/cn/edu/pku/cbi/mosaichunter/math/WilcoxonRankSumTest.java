@@ -2,6 +2,8 @@ package cn.edu.pku.cbi.mosaichunter.math;
 
 import java.util.Arrays;
 
+import org.apache.commons.math3.distribution.NormalDistribution;
+
 public class WilcoxonRankSumTest {
     
     private static double EPS = 1e-9;
@@ -58,8 +60,8 @@ public class WilcoxonRankSumTest {
             z += 0.5;
         }
         z /= sigma;
-
-        double p = NormalDistribution.pNormal(z);
+        
+        double p = new NormalDistribution().cumulativeProbability(z);
         double pValue = 2 * Math.min(p, 1 - p); 
         return pValue;
     }

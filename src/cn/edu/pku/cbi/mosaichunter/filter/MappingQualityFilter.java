@@ -2,21 +2,23 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 
 import java.util.Arrays;
 
+//import org.apache.commons.math3.stat.inference.WilcoxonSignedRankTest;
+
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.math.WilcoxonRankSumTest;
 
-public class ReadQualityFilter extends BaseFilter {
+public class MappingQualityFilter extends BaseFilter {
 
     public static final double DEFAULT_MIN_P_VALUE = 0.05;
     
     private final double minPValue;
     
-    public ReadQualityFilter(String name) {
+    public MappingQualityFilter(String name) {
         this(name,
              ConfigManager.getInstance().getDouble(name, "min_p_value", DEFAULT_MIN_P_VALUE));
     }
     
-    public ReadQualityFilter(String name, double minPValue) {
+    public MappingQualityFilter(String name, double minPValue) {
         super(name);
         this.minPValue = minPValue;        
     }
@@ -29,11 +31,10 @@ public class ReadQualityFilter extends BaseFilter {
         int i2 = 0;
         for (int i = 0; i < filterEntry.getDepth(); ++i) {
             if (filterEntry.getBases()[i] == filterEntry.getMajorAllele()) {
-                majorAlleleQualities[i1] = filterEntry.getBaseQualities()[i];
+                majorAlleleQualities[i1] = filterEntry.getReads()[i].getMappingQuality();
                 i1++;
-            }
-            if (filterEntry.getBases()[i] == filterEntry.getMinorAllele()) {
-                minorAlleleQualities[i2] = filterEntry.getBaseQualities()[i];
+            } else if (filterEntry.getBases()[i] == filterEntry.getMinorAllele()) {
+                minorAlleleQualities[i2] = filterEntry.getReads()[i].getMappingQuality();
                 i2++;
             }
         }
@@ -49,6 +50,8 @@ public class ReadQualityFilter extends BaseFilter {
         for (int i = 0; i < minorAlleleQualities.length; ++i) {
             minorQualities.append(i > 0 ? "," : "").append((int) minorAlleleQualities[i]);
         }
+        
+        //WilcoxonSignedRankTest wsrt = new WilcoxonSignedRankTest();
         
         double p = WilcoxonRankSumTest.twoSided(majorAlleleQualities, minorAlleleQualities);
         filterEntry.setMetadata(
