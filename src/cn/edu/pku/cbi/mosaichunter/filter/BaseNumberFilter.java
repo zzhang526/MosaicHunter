@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class BaseNumberFilter extends BaseFilter {
@@ -31,7 +32,7 @@ public class BaseNumberFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         return filterEntry.getMinorAlleleCount() >= minMinorAlleleNumber &&
                filterEntry.getMinorAlleleCount() >= 
                        filterEntry.getDepth() * minMinorAllelePercentage &&

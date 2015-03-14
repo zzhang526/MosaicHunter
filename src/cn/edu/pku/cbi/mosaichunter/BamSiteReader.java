@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.util.Random;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
-import cn.edu.pku.cbi.mosaichunter.filter.FilterEntry;
+import cn.edu.pku.cbi.mosaichunter.reference.ReferenceManager;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 import net.sf.samtools.SAMRecord;
@@ -13,6 +13,7 @@ import net.sf.samtools.SAMRecordIterator;
 
 public class BamSiteReader {
     
+    private final ReferenceManager referenceManager;
     private final String inputFile;
     private final String indexFile;    
     private final int maxDepth;
@@ -24,8 +25,9 @@ public class BamSiteReader {
     
     private SAMFileReader input;
     
-    public BamSiteReader(String inputFile, String indexFile, 
+    public BamSiteReader(ReferenceManager referenceManager, String inputFile, String indexFile, 
             int maxDepth, int minReadQuality, int minMappingQuality) {
+        this.referenceManager = referenceManager;
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.maxDepth = maxDepth;
@@ -51,7 +53,7 @@ public class BamSiteReader {
         }
     }
     
-    public FilterEntry read(String chr, long position, byte refBase, String alleleOrder) throws Exception  {       
+    public Site read(String chr, long position, byte refBase, String alleleOrder) throws Exception  {       
         if (chr == null || chr.trim().isEmpty()) {
             throw new IllegalArgumentException("chr is missing");
         }
@@ -61,7 +63,7 @@ public class BamSiteReader {
         
         SAMRecordIterator it = input.queryOverlapping(chr, (int) position, (int) position);
         int depth = 0;
-        int cnt = 0;
+        int realDepth = 0;
 
         SAMRecord[] baseRecords = new SAMRecord[maxDepth + 1];
         short[] basePos = new short[maxDepth + 1];
@@ -78,12 +80,12 @@ public class BamSiteReader {
             for (short i = 0; i < read.getReadLength(); ++i) {
                 if (position == read.getReferencePositionAtReadPosition(i + 1)) {
                     if (read.getBaseQualities()[i] >= minReadQuality) {
-                        cnt++;
+                        realDepth++;
                         int ii = -1;
                         if (depth < maxDepth) {
                             ii = depth;
                             depth++;
-                        } else if (depthSampling && random.nextInt(cnt) < maxDepth) {
+                        } else if (depthSampling && random.nextInt(realDepth) < maxDepth) {
                             ii = random.nextInt(maxDepth);
                         }
                         if (ii >= 0) {
@@ -98,18 +100,16 @@ public class BamSiteReader {
             }
         }
          
-        FilterEntry filterEntry = new FilterEntry(
-                         input,
-                         null,
-                         null,
+        Site filterEntry = new Site(
                          chr,
+                         referenceManager.getReferenceId(chr),
                          position,
                          (byte) Character.toUpperCase(refBase),
                          depth,
+                         realDepth,
                          bases,
                          baseQualities,
                          baseRecords,
-                         null,
                          basePos,
                          alleleOrder);           
         it.close();

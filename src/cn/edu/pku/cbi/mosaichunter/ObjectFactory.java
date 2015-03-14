@@ -32,4 +32,8 @@ abstract public class ObjectFactory<T> {
         return name;
     }
     
+    public int getSize() {
+        return objects.size();
+    }
+    
 }

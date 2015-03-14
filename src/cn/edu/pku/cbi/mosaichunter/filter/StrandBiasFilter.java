@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.math.FishersExactTest;
 
@@ -20,7 +21,7 @@ public class StrandBiasFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         double p = FishersExactTest.twoSided(
                 filterEntry.getPositiveMajorAlleleCount(),
                 filterEntry.getPositiveMinorAlleleCount(),

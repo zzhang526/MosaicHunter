@@ -7,24 +7,34 @@ import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Random;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.filter.Filter;
-import cn.edu.pku.cbi.mosaichunter.filter.FilterEntry;
 import cn.edu.pku.cbi.mosaichunter.filter.FilterFactory;
+import cn.edu.pku.cbi.mosaichunter.reference.Reference;
+import cn.edu.pku.cbi.mosaichunter.reference.ReferenceManager;
 import net.sf.samtools.AlignmentBlock;
-import net.sf.samtools.SAMFileHeader;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
+import net.sf.samtools.SAMSequenceRecord;
 
 
 public class BamScanner {
+    
+    
+    //public static final String DEFAULT_REFERENCE_PREFIX = "";
+    
+    public static final String[] DEFAULT_VALID_REFERENCES = new String[] {
+            "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", 
+            "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y"  
+    };
     
     private final String inputFile;
     private final String indexFile;    
@@ -41,17 +51,20 @@ public class BamScanner {
         this(ConfigManager.getInstance().get(null, "input_file", null),
              ConfigManager.getInstance().get(null, "index_file", null),
              ConfigManager.getInstance().get(null, "reference_file", null),
-             FilterFactory.create(ConfigManager.getInstance().get(null, "in_process_filter_name", null)),
-             FilterFactory.create(ConfigManager.getInstance().get(null, "post_process_filter_name", null)),
+             FilterFactory.create(ConfigManager.getInstance().get(
+                     null, "in_process_filter_name", null)),
+             FilterFactory.create(ConfigManager.getInstance().get(
+                     null, "post_process_filter_name", null)),
              ConfigManager.getInstance().getInt(null, "max_depth"),
-             ConfigManager.getInstance().getInt(null, "max_sites", 10000),
+             ConfigManager.getInstance().getInt(null, "max_sites", 500000),
              ConfigManager.getInstance().getLong(null, "seed", System.currentTimeMillis()),
              ConfigManager.getInstance().getBoolean(null, "depth_sampling", false)
              );        
     }
     
     public BamScanner(String inputFile, String indexFile, String referenceFile, 
-            Filter inProcessFilter, Filter postProcessfilter, int maxDepth, int maxSites, long seed, boolean depthSampling) throws Exception {
+            Filter inProcessFilter, Filter postProcessfilter, int maxDepth, 
+            int maxSites, long seed, boolean depthSampling) throws Exception {
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.referenceFile = referenceFile;
@@ -67,21 +80,365 @@ public class BamScanner {
     }
     
     public void scan() throws Exception  {       
-        
         System.out.println(new Date() + " Initializing...");
         
-        ArrayManager arrayManager = new ArrayManager(160, Math.max(160, maxDepth + 1));
-     
+        ConfigManager config = ConfigManager.getInstance();
+        
+        // site object facetory
+        int initialMinDepth = 160;
+        int initialMaxDepth = Math.max(initialMinDepth, maxDepth);
+        SiteObjectManager siteManager = new SiteObjectManager(initialMinDepth, initialMaxDepth);
+        
+        // reference manager
+        ReferenceManager referenceManager = createReferenceManager();
+        
+        // sam reader
         SAMFileReader samFileReader = new SAMFileReader(
                 new File(inputFile), 
                 indexFile == null ? null : new File(indexFile));
         samFileReader.setValidationStringency(ValidationStringency.SILENT);
      
+        // reads cache
+        ReadsCache readsCache = new ReadsCache(config.getInt(
+                null, "max_recent_reads" , 100000));
+        
+        // context
+        MosaicHunterContext context = 
+                new MosaicHunterContext(samFileReader, referenceManager, readsCache);
+        
+        System.out.println(new Date() + " Initializing filters...");
+        inProcessFilter.init(context);
+        postProcessfilter.init(context);
+        
+        // scan
+        SAMFileReader input = new SAMFileReader(
+                new File(inputFile), 
+                indexFile == null ? null : new File(indexFile));
+        input.setValidationStringency(ValidationStringency.SILENT);
+        
+        boolean ok = true;
+        int matchedReferences = 0;
+        for (SAMSequenceRecord seq : input.getFileHeader().getSequenceDictionary().getSequences()) {
+            int sid = referenceManager.getReferenceId(seq.getSequenceName());
+            if (sid >= 0) {
+                if (seq.getSequenceLength() == referenceManager.getReferenceLength(sid)) {
+                    matchedReferences++;
+                } else {
+                    System.out.println("inconsistent reference length: " + seq.getSequenceName());
+                    ok = false;
+                }
+            }
+        }
+        
+        if (!ok) {
+            input.close();
+            samFileReader.close();
+            return;
+        }
+        //System.out.println("matched reference number: " + matchedReferences);
+        
+        // TODO remove
+        long[] cnt = new long[100];
+        
+        long processedReads = 0;
+        long processedSites = 0;
+        long totalSites = 0;
+        long startTime = System.currentTimeMillis();
+        long depthSum = 0;
+        long depthCount = 0;
+        
+        int minReadQuality = config.getInt(null, "min_read_quality", 0);
+        int minMappingQuality = config.getInt(null, "min_mapping_quality", 0);
+        
+        String chr = config.get(null, "chr", null);
+        String inputBedFile = config.get(null, "input_bed_file", null);
+        boolean inputSampling = config.getBoolean(null, "input_sampling", false);
+        
+        List<Region> regions = null;
+        if (chr != null && !chr.trim().isEmpty()) {
+            int chrId = referenceManager.getReferenceId(chr);
+            if (chrId < 0) {
+                input.close();
+                samFileReader.close();
+                throw new Exception("invalid chr parameter");
+            }
+            int startPosition = config.getInt(null, "start_position", 1);
+            int endPosition = config.getInt(null, "end_position", Integer.MAX_VALUE);
+            if (endPosition > referenceManager.getReferenceLength(chrId)) {
+                endPosition = (int) referenceManager.getReferenceLength(chrId);
+            }
+            regions = new ArrayList<Region>(Collections.singletonList(
+                    new Region(chr, chrId, startPosition, endPosition)));
+        } else if (inputBedFile != null && !inputBedFile.trim().isEmpty()) {
+            regions = MosaicHunterHelper.readBedFile(inputBedFile, referenceManager);
+        } else if (inputSampling) {
+            int inputSamplingRegions = config.getInt(null, "input_sampling_regions", 1);
+            int inputSamplingSize  = config.getInt(null, "input_sampling_size", 1);
+            regions = MosaicHunterHelper.generateRandomRegions(
+                    random, inputSamplingRegions, inputSamplingSize, referenceManager);
+        }
+        if (regions != null) {
+            regions = MosaicHunterHelper.sortAndCombineRegions(regions);
+            for (Region r : regions) {
+                totalSites += r.getEnd() - r.getStart() + 1;
+            }
+        } else {
+            regions = new ArrayList<Region>();
+            for (Reference ref : referenceManager.getReferences()) {
+                Region region = new Region(
+                        ref.getName(),
+                        referenceManager.getReferenceId(ref.getName()),
+                        1,
+                        (int) ref.getLength());
+                regions.add(region);
+            }
+            totalSites = referenceManager.getTotalLength();
+        }
+        
+        List<Site> passedSites = new ArrayList<Site>();
+        
+        System.out.println(new Date() + " Scanning...");
+
+        StatsManager.start("in_process");
+        
+        System.out.println(
+                new Date() + " -" +
+                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
+                " Reads:" + 0 +
+                " Sites:" + 0 + "/" + totalSites + 
+                " Progress:" + String.format("%.2f", 0.0) + "%");
+        
+        
+        for (Region region : regions) {
+            long startPositionId;
+            long endPositionId;
+            SAMRecordIterator it = null;
+            if (region == null) {
+                it = input.iterator();
+                startPositionId = 0;
+                endPositionId = Long.MAX_VALUE;
+            } else {
+                it = input.queryOverlapping(region.getChr(), region.getStart(), region.getEnd()); 
+                startPositionId = getPositionId(region.getChrId(), region.getStart());
+                endPositionId = getPositionId(region.getChrId(), region.getEnd()); 
+            }
+            
+            String lastRefName = null;
+            int lastRefPos = 0;
+            long lastPositionId = 0;      
+            
+            int readsBufferSize = (1 << 17) - 1;
+            SAMRecord[] readsBuffer = new SAMRecord[readsBufferSize + 1];
+            int readsBatchSize = 1000;
+            long first = 0;
+            long last = 0;
+            
+            PriorityQueue<Long> siteIds = new PriorityQueue<Long>();
+            HashMap<Long, Site> sites = new HashMap<Long, Site>();
+            
+            while (it.hasNext() || first != last) {
+                while (last - first < readsBufferSize && it.hasNext()) {
+                    SAMRecord read = it.next();
+                    readsBuffer[(int) (last & readsBufferSize)] = read;
+                    last++;
+                    readsCache.cacheRead(read);
+                }
+                long end = Math.min(first + readsBatchSize, last);
+                while (first < end) {
+                    SAMRecord read = readsBuffer[(int) (first & readsBufferSize)];
+                    processedReads++;
+                    first++;
+                    if (first % 1000000 == 0) {
+                        long startRefPos = 1;
+                        if (getRefId(lastPositionId) == getRefId(startPositionId)) {
+                            startRefPos = getRefPos(startPositionId);
+                        }
+                        long done = processedSites + lastRefPos - startRefPos;
+                        double progress = (double) done * 100 / (totalSites <= 0 ? 1 : totalSites);
+                        System.out.println(
+                                new Date() + " -" +
+                                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
+                                " Reads:" + processedReads +
+                                " Sites:" + done + "/" + totalSites + 
+                                " Progress:" + String.format("%.2f", progress) + "%" + 
+                                " " + lastRefName + ":" + lastRefPos);
+                    }
+                    
+                    // filter invalid reference
+                    if (!read.getReferenceName().equals(lastRefName) && 
+                        referenceManager.getReferenceId(read.getReferenceName()) < 0) {
+                        continue;
+                    }
+                    
+                    // TODO add parameter?
+                    if (read.getDuplicateReadFlag()) {
+                        continue;
+                    }
+                    if (read.getMappingQuality() < minMappingQuality) {
+                        continue;
+                    }
+                    String refName = read.getReferenceName();
+                    int refId = referenceManager.getReferenceId(refName);
+                    if (refId < 0) {
+                        continue;
+                    }
+                    
+                    lastPositionId = getPositionId(refId, read.getAlignmentStart());
+                    lastRefName = read.getReferenceName();
+                    lastRefPos = read.getAlignmentStart();
+                    byte[] bases = read.getReadBases();
+                    //byte[] baseQs = read.getBaseQualities();
+                    for (AlignmentBlock block : read.getAlignmentBlocks()) {
+                        int refPos = block.getReferenceStart();
+                        for (int i = 0; i < block.getLength(); ++i, ++refPos) {
+                            long posId = getPositionId(refId, refPos);
+                            if (posId < startPositionId || posId > endPositionId) {
+                                continue;
+                            }
+
+                            short basePos = (short) (block.getReadStart() + i - 1);
+                            if (read.getBaseQualities()[basePos] < minReadQuality) {
+                                continue;
+                            }
+                            int baseId = MosaicHunterHelper.BASE_TO_ID[bases[basePos]];
+                            if (baseId < 0) {
+                                continue;
+                            }
+                            Site site = sites.get(posId);
+                            if (site == null) {
+                                byte ref = referenceManager.getBaseWithCache(refId, refPos);
+                                if (ref == 'N') {
+                                    continue;
+                                }
+
+                                int initialDepth = (int)(depthSum / (depthCount + 1) * 2);
+                                initialDepth = Math.max(initialDepth, initialMinDepth);
+                                initialDepth = Math.min(initialDepth, initialMaxDepth);
+                                site = siteManager.getSite(initialDepth);
+                                site.init(refName, refId, refPos, ref, 0, 0, null);
+                                sites.put(posId, site);
+                                siteIds.add(posId);
+                            }
+                            site.increaceRealDepth();
+                            if (site.getDepth() < maxDepth) {
+                                if (site.getDepth() >= site.getMaxDepth()) {
+                                    Site newSite = siteManager.getSite(site.getMaxDepth() + 1);
+                                    newSite.copy(site);
+                                    sites.put(posId, newSite);
+                                    siteManager.returnSite(site);
+                                    site = newSite;
+                                }
+                                site.addRead(read, basePos);
+                                
+                            } else if (depthSampling && random.nextInt(site.getRealDepth()) < maxDepth) {
+                               int ii = random.nextInt(maxDepth);
+                               site.replaceRead(ii, read, basePos);
+                            }
+                            
+                        }
+                    }
+                }
+                
+                boolean hasMoreReads = it.hasNext() || first != last;
+                
+                for (Iterator<Long> itor = siteIds.iterator(); itor.hasNext();) {
+                    long positionId = itor.next();
+                    //int refId = getRefId(positionId);
+                    //int refPos = getRefPos(positionId);
+                    Site site = sites.get(positionId);
+                    if (site == null) {
+                        System.out.println("ERROR!!! null site. " + 
+                                referenceManager.getReference(getRefId(positionId)).getName() + ":" + getRefPos(positionId));
+                        itor.remove();
+                        continue;
+                    }
+                    if (hasMoreReads && positionId >= lastPositionId) {
+                        break;
+                    }
+                    depthSum += site.getDepth();
+                    depthCount++;
+                    
+                    cnt[0] ++;
+                    cnt[1] += site.getDepth();
+                   
+                    
+                    sites.remove(positionId);
+                    itor.remove();
+                    
+                    if (passedSites.size() < maxSites && inProcessFilter.filter(site)) {
+                        passedSites.add(site);   
+                    } else {
+                        siteManager.returnSite(site);
+                    }
+                }
+                //siteManager.printInfo();
+                 
+                 
+
+            } 
+            if (region != null) {
+                processedSites += region.getEnd() - region.getStart() + 1;
+            } else {
+                processedSites = totalSites;
+            }
+            it.close();
+        }
+        
+        System.out.println(
+                new Date() + " -" +
+                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
+                " Reads:" + processedReads +
+                " Sites:" + totalSites + "/" + totalSites + 
+                " Progress:" + String.format("%.2f", 100.0) + "%");
+        
+        StatsManager.end("in_process");
+        
+        StatsManager.start("post_process");
+        postProcessfilter.filter(passedSites);
+        StatsManager.end("post_process");
+         
+        inProcessFilter.printStats(true);
+        postProcessfilter.printStats(false);
+        
+        input.close();
+        samFileReader.close();
+        inProcessFilter.close();
+        postProcessfilter.close();
+        
+    }
+    
+    
+  
+    
+    private long getPositionId(long refId, long refPos) {
+        return (refId << 40) + refPos;
+    }
+    
+    private int getRefId(long posId) {
+        return (int) (posId >>> 40);
+    }
+    
+    private int getRefPos(long posId) {
+        return (int) (posId & ((1L << 40) - 1));
+    }
+    
+    private ReferenceManager createReferenceManager() throws Exception {
+        
+        //String referencePrefix = ConfigManager.getInstance().get(
+        //        null, "reference_prefix", DEFAULT_REFERENCE_PREFIX);
+        String[] validReferences = ConfigManager.getInstance().getValues(
+                null, "valid_references", DEFAULT_VALID_REFERENCES);
+    
         ReferenceManager referenceManager = null;
         if (ConfigManager.getInstance().getBoolean(null, "enable_reference_cache", false)) {
-            String od = ConfigManager.getInstance().get(null, "output_dir", ".");
+            String odName = ConfigManager.getInstance().get(null, "output_dir", ".");
+            File od = new File(odName);
+            if (!od.isDirectory()) {
+                od.mkdirs();
+            }
             File cacheFile = new File(od, new File(referenceFile + ".cache").getName());
-            System.out.println(new Date() + " Reading reference from cache file: " + cacheFile.getAbsolutePath());
+            System.out.println(new Date() + " Reading reference from cache file: " + 
+                    cacheFile.getAbsolutePath());
             if (cacheFile.isFile()) {
                 ObjectInputStream ois = null;
                 try {
@@ -90,7 +447,8 @@ public class BamScanner {
                     referenceManager = (ReferenceManager) ois.readObject();
                     ois.close();
                 } catch (Exception e) {
-                    System.out.println(new Date() + " Cannot read cache file: " + cacheFile.getAbsolutePath() + " " + e.getMessage());
+                    System.out.println(new Date() + " Cannot read cache file: " + 
+                            cacheFile.getAbsolutePath() + " " + e.getMessage());
                 } finally {
                     if (ois != null) {
                         try {
@@ -103,8 +461,9 @@ public class BamScanner {
             
             if (referenceManager == null) {
                 System.out.println(new Date() + " Reading reference from file: " + referenceFile);
-                referenceManager = new ReferenceManager(referenceFile);
-                System.out.println(new Date() + " Writing reference to cache file: " + cacheFile.getAbsolutePath());
+                referenceManager = new ReferenceManager(referenceFile, validReferences);
+                System.out.println(new Date() + " Writing reference to cache file: " + 
+                        cacheFile.getAbsolutePath());
                 ObjectOutputStream oos = null;
                 try {
                     FileOutputStream fos = new FileOutputStream(cacheFile);
@@ -112,7 +471,8 @@ public class BamScanner {
                     oos.writeObject(referenceManager);
                     oos.close(); 
                 } catch (Exception e) {
-                    System.out.println(new Date() + " Cannot write cache file: " + cacheFile.getAbsolutePath() + " " + e.getMessage());
+                    System.out.println(new Date() + " Cannot write cache file: " + 
+                            cacheFile.getAbsolutePath() + " " + e.getMessage());
                     e.printStackTrace();
                     
                 } finally {
@@ -126,369 +486,11 @@ public class BamScanner {
             }
         } else {
             System.out.println(new Date() + " Reading reference from file: " + referenceFile);
-            referenceManager = new ReferenceManager(referenceFile);
+            referenceManager = new ReferenceManager(referenceFile, validReferences);
         }
         
-        
-        System.out.println(new Date() + " Initiazing filters...");
-        inProcessFilter.init();
-        postProcessfilter.init();
-        
-        
-        // scan
-        
-        SAMFileReader input = new SAMFileReader(
-                new File(inputFile), 
-                indexFile == null ? null : new File(indexFile));
-        input.setValidationStringency(ValidationStringency.SILENT);
-        
-        SAMFileHeader h = input.getFileHeader();
-        int chrN = 24;
-        long refSize = 0;
-        long[] chrSizes = new long[chrN];
-        String[] chrNames = new String[chrN];
-        for (int i = 0; i < chrN; ++i) {
-            chrSizes[i] = h.getSequenceDictionary().getSequence(i).getSequenceLength();
-            chrNames[i] = h.getSequenceDictionary().getSequence(i).getSequenceName();
-            refSize += chrSizes[i];
-        }
-        
-        long processedEntries = 0;
-        long processedSites = 0;
-        long totalSites = 0;
-        long startTime = System.currentTimeMillis();
-        long depthSum = 0;
-        long depthCount = 0;
-        
-        ConfigManager config = ConfigManager.getInstance();
-        int minReadQuality = config.getInt(null, "min_read_quality", 0);
-        int minMappingQuality = config.getInt(null, "min_mapping_quality", 0);
-        ReadCache readCache = new ReadCache(ConfigManager.getInstance().getInt(
-                null, "max_recent_reads" , 100000));
-        
-        String chr = config.get(null, "chr", null);
-        String inputBedFile = config.get(null, "input_bed_file", null);
-        boolean inputSampling = config.getBoolean(null, "input_sampling", false);
-        
-        List<Region> regions = null;
-        if (chr != null && !chr.trim().isEmpty()) {
-            int chrId = MosaicHunterHelper.getChrId(chr);
-            if (chrId <= 0) {
-                input.close();
-                samFileReader.close();
-                throw new Exception("invalid chr parameter");
-            }
-            int startPosition = config.getInt(null, "start_position", 1);
-            int endPosition = config.getInt(null, "end_position", Integer.MAX_VALUE);
-            if (endPosition > chrSizes[chrId - 1]) {
-                endPosition = (int) chrSizes[chrId - 1];
-            }
-            regions = new ArrayList<Region>(Collections.singletonList(
-                    new Region(chr, chrId, startPosition, endPosition)));
-        } else if (inputBedFile != null && !inputBedFile.trim().isEmpty()) {
-            regions = MosaicHunterHelper.readBedFile(inputBedFile);
-        } else if (inputSampling) {
-            int inputSamplingRegions = config.getInt(null, "input_sampling_regions", 1);
-            int inputSamplingSize  = config.getInt(null, "input_sampling_size", 1);
-            regions = MosaicHunterHelper.generateRandomRegions(
-                    random, chrSizes, chrNames, inputSamplingRegions, inputSamplingSize);
-        }
-        if (regions != null) {
-            regions = MosaicHunterHelper.sortAndCombineRegions(regions);
-            for (Region r : regions) {
-                totalSites += r.getEnd() - r.getStart() + 1;
-            }
-        } else {
-            regions = Collections.singletonList(null);
-            totalSites = refSize;
-        }
-        
-        
-        List<FilterEntry> filterEntries = new ArrayList<FilterEntry>();
-        
-        System.out.println(new Date() + " Scanning...");
-
-        StatsManager.start("in_process");
-        
-        System.out.println(
-                new Date() + " -" +
-                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
-                " Reads:" + processedEntries +
-                " Sites:" + 0 + "/" + totalSites + 
-                " Progress:" + String.format("%.2f", 0.0) + "%");
-        
-        for (Region region : regions) {
-            int startPosition = 1;
-            int endPosition = Integer.MAX_VALUE;
-            SAMRecordIterator it = null;
-            if (region == null) {
-                it = input.iterator();
-            } else {
-                it = input.queryOverlapping(region.getChr(), region.getStart(), region.getEnd()); 
-                startPosition = region.getStart();
-                endPosition = region.getEnd();   
-            }
-            
-            String lastRefName = null;
-            long lastRefPos = startPosition;
-            
-            LinkedList<ScanEntry> scanEntries = new LinkedList<ScanEntry>();
-            SAMRecordIteratorBuffer itBuffer = new SAMRecordIteratorBuffer(
-                    it, ConfigManager.getInstance().getInt(null, "read_buffer_size" , 100000), readCache);
-          
-            while (true) {
-                ScanEntry currentEntry = null;
-                while (itBuffer.hasNext() && currentEntry == null) {
-                    SAMRecord next = itBuffer.next(); 
-                    processedEntries++;
-                    if (processedEntries % 1000000 == 0) {
-                        long done = processedSites + lastRefPos - startPosition;
-                        double progress = (double) done * 100 / totalSites;
-                        System.out.println(
-                                new Date() + " -" +
-                                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
-                                " Reads:" + processedEntries +
-                                " Sites:" + done + "/" + totalSites + 
-                                " Progress:" + String.format("%.2f", progress) + "%" + 
-                                " " + lastRefName + ":" + lastRefPos);
-                    }
-                    if (next.getDuplicateReadFlag()) {
-                        continue;
-                    }
-                    if (next.getMappingQuality() < minMappingQuality) {
-                        continue;
-                    }
-                    if (MosaicHunterHelper.getChrId(MosaicHunterHelper.getChr(next.getReferenceName())) <= 0) {
-                        continue;
-                    }
-                    currentEntry = new ScanEntry();
-                    currentEntry.record = next;
-                    currentEntry.chr = MosaicHunterHelper.getChr(next.getReferenceName());
-                    currentEntry.alignmentBlocks = new LinkedList<AlignmentBlock>(
-                            currentEntry.record.getAlignmentBlocks());
-                }
-                long currentRefPos = Long.MAX_VALUE;
-                if (currentEntry != null && currentEntry.chr.equals(lastRefName)) {
-                    currentRefPos = currentEntry.record.getAlignmentStart();
-                } 
-                
-                for (long pos = lastRefPos; pos < currentRefPos && !scanEntries.isEmpty(); ++pos) {
-                    int depth = 0;
-                    int cnt = 0;
-                    int currentDepth = (int)(depthSum / (depthCount + 1) * 2);
-                    currentDepth = Math.max(currentDepth, 100);
-                    currentDepth = Math.min(currentDepth, maxDepth + 1);
-                    
-                    SAMRecord[] reads = arrayManager.getSAMRecordArray(currentDepth);
-                    short[] basePos = arrayManager.getShortArray(currentDepth);
-                    byte[] bases = arrayManager.getByteArray(currentDepth);
-                    byte[] baseQualities = arrayManager.getByteArray(currentDepth);
-                    currentDepth = baseQualities.length;
-                    
-                    for (Iterator<ScanEntry> it2 = scanEntries.iterator(); it2.hasNext();) {                                              
-                        ScanEntry entry = it2.next();
-                        AlignmentBlock block = null;
-                        while (!entry.alignmentBlocks.isEmpty()) {
-                            block = entry.alignmentBlocks.getFirst();
-                            if (pos < block.getReferenceStart() + block.getLength()) {
-                                break;
-                            }
-                            entry.alignmentBlocks.pop();
-                            block = null;
-                        }
-                        if (block == null) {
-                            it2.remove();
-                        } else if (pos >= block.getReferenceStart()) {
-                            short p = (short) (pos - block.getReferenceStart() + block.getReadStart() - 1);
-                            byte quality = entry.record.getBaseQualities()[p];
-                            if (quality >= minReadQuality) {
-                                cnt++;
-                                if (depth >= currentDepth) {
-                                    SAMRecord[] newReads = arrayManager.getSAMRecordArray(currentDepth + 1);
-                                    short[] newBasePos = arrayManager.getShortArray(currentDepth + 1);
-                                    byte[] newBases = arrayManager.getByteArray(currentDepth + 1);
-                                    byte[] newBaseQualities = arrayManager.getByteArray(currentDepth + 1);
-                                    currentDepth = newBaseQualities.length;
-                                    
-                                    System.arraycopy(reads, 0, newReads, 0, depth);
-                                    System.arraycopy(basePos, 0, newBasePos, 0, depth);
-                                    System.arraycopy(bases, 0, newBases, 0, depth);
-                                    System.arraycopy(baseQualities, 0, newBaseQualities, 0, depth);
-                                    
-                                    arrayManager.returnSAMRecordArray(reads);
-                                    arrayManager.returnShortArray(basePos);
-                                    arrayManager.returnByteArray(bases);
-                                    arrayManager.returnByteArray(baseQualities);
-                                    
-                                    reads = newReads;
-                                    basePos = newBasePos;
-                                    bases = newBases;
-                                    baseQualities = newBaseQualities;
-                                    
-                                    StatsManager.count("depth_array_expand");
-                                }
-                                int ii = -1;
-                                if (depth < maxDepth) {
-                                    ii = depth;
-                                    depth++;
-                                } else if (depthSampling && random.nextInt(cnt) < maxDepth) {
-                                    ii = random.nextInt(maxDepth);
-                                }
-                                if (ii >= 0) {
-                                    reads[ii] = entry.record;
-                                    basePos[ii] = p;
-                                    bases[ii] = entry.record.getReadBases()[p];
-                                    baseQualities[ii] = quality;
-                                }
-                            }
-                        }
-                    }  
-                    
-                    depthSum += depth;
-                    depthCount++;
-                    
-                    if (depth > 0 && pos >= startPosition && pos <= endPosition) {
-                        //byte refBase = referenceScanner.getBaseAt(lastRefName, pos);
-                        byte refBase = referenceManager.getBase(lastRefName, (int) pos);
-                        
-                        if (refBase != 0 && refBase != 'N') {
-                            refBase = (byte) Character.toUpperCase(refBase);
-                            FilterEntry filterEntry = new FilterEntry(
-                                    samFileReader,
-                                    readCache,
-                                    referenceManager,
-                                    lastRefName,
-                                    pos,
-                                    refBase,
-                                    depth,
-                                    bases,
-                                    baseQualities,
-                                    reads,
-                                    null,
-                                    basePos);
-                            
-                            if (filterEntries.size() < maxSites && inProcessFilter.filter(filterEntry)) {
-                                filterEntries.add(filterEntry);   
-                                reads = null;
-                                basePos = null;
-                                bases = null;
-                                baseQualities = null;
-                            }
-                        }
-                    }                    
-                    arrayManager.returnSAMRecordArray(reads);
-                    arrayManager.returnShortArray(basePos);
-                    arrayManager.returnByteArray(bases);
-                    arrayManager.returnByteArray(baseQualities);
-                    
-                }
-                
-                if (currentEntry == null) {
-                    break;
-                }
-                if (currentEntry.chr.equals(lastRefName)) {
-                    lastRefPos = currentRefPos;
-                } else {
-                    if (region == null) {
-                        // TODO: should be chr length
-                        processedSites += lastRefPos + 1;
-                    }
-                    lastRefName = currentEntry.chr;
-                    lastRefPos = currentEntry.record.getAlignmentStart();
-                }            
-                scanEntries.add(currentEntry);
-            }  
-            if (region != null) {
-                processedSites += endPosition - startPosition + 1;
-            }
-            it.close();
-        }
-        System.out.println(
-                new Date() + " -" +
-                " Time(s):" + (System.currentTimeMillis() - startTime) / 1000 + 
-                " Reads:" + processedEntries +
-                " Sites:" + totalSites + "/" + totalSites + 
-                " Progress:" + String.format("%.2f", 100.0) + "%");
-        
-        StatsManager.end("in_process");
-        
-        StatsManager.start("post_process");
-        postProcessfilter.filter(filterEntries);
-        StatsManager.end("post_process");
-        
-        for (FilterEntry filterEntry : filterEntries) {
-            arrayManager.returnSAMRecordArray(filterEntry.getReads());
-            arrayManager.returnShortArray(filterEntry.getBasePos());
-            arrayManager.returnByteArray(filterEntry.getBases());
-            arrayManager.returnByteArray(filterEntry.getBaseQualities());
-        }
-        
-        inProcessFilter.printStats(true);
-        postProcessfilter.printStats(false);
-        
-        input.close();
-        samFileReader.close();
-        inProcessFilter.close();
-        postProcessfilter.close();
+        return referenceManager;
     }
-    
-    private static class ScanEntry {
-        private String chr;
-        private SAMRecord record;
-        private LinkedList<AlignmentBlock> alignmentBlocks;
-    }
-    
-    private class SAMRecordIteratorBuffer {
-        
-        private final int bufferSize;
-        private final SAMRecord[] buffer;
-        private final SAMRecordIterator it;
-        private final ReadCache readCache;
-        
-        private int start = 0;
-        private int end = 0;
-        private boolean hasNext;
-        
-        public SAMRecordIteratorBuffer(SAMRecordIterator it, int bufferSize, ReadCache readCache) {
-            this.it = it;
-            this.readCache = readCache;
-            this.bufferSize = bufferSize;
-            buffer = new SAMRecord[bufferSize];
-            
-            while(it.hasNext() && end < bufferSize) {
-                buffer[end] = it.next();
-                readCache.cacheRead(buffer[end]);
-                end++;
-            }
-            hasNext = it.hasNext();
-        }
-        
-        public SAMRecord next() {
-            SAMRecord r = null;
-            if (hasNext) {
-                r = buffer[start];
-                buffer[start] = it.next();
-                readCache.cacheRead(buffer[start]);
-                hasNext = it.hasNext();
-            } else if (end == bufferSize) {
-                end = start;
-                r = buffer[start];
-            } else if (end == start) {
-                return null;
-            } else {
-                r = buffer[start];
-            }
-            start++;
-            if (start >= bufferSize) {
-                start = 0;
-            }
-            return r;
-        }
-        
-        public boolean hasNext() {
-            return hasNext || start != end;
-        }
-    }
-    
+   
 }
 

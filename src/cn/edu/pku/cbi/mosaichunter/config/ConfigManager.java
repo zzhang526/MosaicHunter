@@ -3,6 +3,7 @@ package cn.edu.pku.cbi.mosaichunter.config;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Properties;
 
 public class ConfigManager {
@@ -16,6 +17,10 @@ public class ConfigManager {
     
     public static ConfigManager getInstance() {
         return instance;
+    }
+    
+    public Properties getProperties() {
+        return properties;
     }
     
     public void clear() {
@@ -99,6 +104,22 @@ public class ConfigManager {
         return Integer.parseInt(value);
     }
     
+    public int[] getInts(String namespace, String name) {
+        return getInts(namespace, name, null);
+    }
+    
+    public int[] getInts(String namespace, String name, int[] defaultValue) {
+        String[] values = getValues(namespace, name);
+        if (values == null) {
+            return defaultValue;
+        }
+        int[] result = new int[values.length];
+        for (int i = 0; i < values.length; ++i) {
+            result[i] = Integer.parseInt(values[i]);
+        }
+        return result;
+    }
+    
     public Long getLong(String namespace, String name) {
         return getLong(namespace, name, null);
     }
@@ -109,6 +130,22 @@ public class ConfigManager {
             return defaultValue;
         }
         return Long.parseLong(value);
+    }
+    
+    public long[] getLongs(String namespace, String name) {
+        return getLongs(namespace, name, null);
+    }
+    
+    public long[] getLongs(String namespace, String name, long[] defaultValue) {
+        String[] values = getValues(namespace, name);
+        if (values == null) {
+            return defaultValue;
+        }
+        long[] result = new long[values.length];
+        for (int i = 0; i < values.length; ++i) {
+            result[i] = Long.parseLong(values[i]);
+        }
+        return result;
     }
     
     public void loadProperties(String configFile) throws IOException {
@@ -149,9 +186,21 @@ public class ConfigManager {
     }
     
     public void print() {
-        Object[] keys = properties.keySet().toArray();
-        Arrays.sort(keys);
-        for (Object key : keys) {
+        String[] keys = properties.stringPropertyNames().toArray(new String[0]);
+        Arrays.sort(keys, new Comparator<String>() {
+            public int compare(String a, String b) {
+                boolean hasNamespaceA = a.contains(".");
+                boolean hasNamespaceB = b.contains(".");
+                if (hasNamespaceA && !hasNamespaceB) {
+                    return 1;
+                }
+                if (hasNamespaceB && !hasNamespaceA) {
+                    return -1;
+                }
+                return a.compareTo(b);
+            }
+        });
+        for (String key : keys) {
             System.out.println(key + " = " + properties.get(key));
         }
     }

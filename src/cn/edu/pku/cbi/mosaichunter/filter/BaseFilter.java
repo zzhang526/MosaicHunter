@@ -9,6 +9,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.StatsManager;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
@@ -22,6 +24,7 @@ abstract public class BaseFilter implements Filter {
     private FileWriter passedWriter = null;
     private long entries = 0;
     private long passedEntries = 0;
+    private MosaicHunterContext context;
     
     public static final DecimalFormat format = new DecimalFormat("0.00000");
     
@@ -48,7 +51,8 @@ abstract public class BaseFilter implements Filter {
         return passedEntries;
     }
     
-    public void init() throws Exception {
+    public void init(MosaicHunterContext context) throws Exception {
+        this.context = context;
         if (outputFiltered) {
             makeOutputDir();
             filteredWriter = new FileWriter(new File(outputDir, name + ".filtered.tsv"));
@@ -81,7 +85,7 @@ abstract public class BaseFilter implements Filter {
         return outputDir;
     }
     
-    public boolean filter(FilterEntry filterEntry) {
+    public boolean filter(Site filterEntry) {
         StatsManager.start(name);
         boolean result = doFilter(filterEntry);
         entries++;
@@ -95,19 +99,19 @@ abstract public class BaseFilter implements Filter {
         return result; 
     }
     
-    public List<FilterEntry> filter(List<FilterEntry> filterEntries) {
+    public List<Site> filter(List<Site> filterEntries) {
         StatsManager.start(name);
-        List<FilterEntry> results = doFilter(filterEntries);
+        List<Site> results = doFilter(filterEntries);
         entries += filterEntries.size();
         passedEntries += results.size();
         if (passedWriter != null || filteredWriter != null) {
-            Set<FilterEntry> passed = new HashSet<FilterEntry>();
-            for (FilterEntry filterEntry : results) {
+            Set<Site> passed = new HashSet<Site>();
+            for (Site filterEntry : results) {
                 output(filterEntry, true);
                 passed.add(filterEntry);
                 filterEntry.getPassedFilters().add(getName());
             }
-            for (FilterEntry filterEntry : filterEntries) {
+            for (Site filterEntry : filterEntries) {
                 if (!passed.contains(filterEntry)) {
                     output(filterEntry, false);
                 }
@@ -130,11 +134,11 @@ abstract public class BaseFilter implements Filter {
        
     }
        
-    abstract public boolean doFilter(FilterEntry filterEntry);
+    abstract public boolean doFilter(Site filterEntry);
     
-    public List<FilterEntry> doFilter(List<FilterEntry> filterEntries) {
-        List<FilterEntry> results = new ArrayList<FilterEntry>();
-        for (FilterEntry entry : filterEntries) {
+    public List<Site> doFilter(List<Site> filterEntries) {
+        List<Site> results = new ArrayList<Site>();
+        for (Site entry : filterEntries) {
             if (doFilter(entry)) {
                 results.add(entry);
             }
@@ -142,14 +146,14 @@ abstract public class BaseFilter implements Filter {
         return results;
     }
     
-    public Object[] getOutputMetadata(FilterEntry filterEntry) {
+    public Object[] getOutputMetadata(Site filterEntry) {
         return filterEntry.getMetadata(name);
     }
     
-    public String buildOutput(FilterEntry filterEntry) {
+    public String buildOutput(Site filterEntry) {
         
         StringBuilder sb = new StringBuilder();
-        sb.append(filterEntry.getChrName()).append('\t');
+        sb.append(filterEntry.getRefName()).append('\t');
         sb.append(filterEntry.getRefPos()).append('\t');
         sb.append((char) filterEntry.getRef()).append('\t');
         sb.append(filterEntry.getDepth()).append('\t');
@@ -191,7 +195,7 @@ abstract public class BaseFilter implements Filter {
         return sb.toString();               
     }
     
-    public void output(FilterEntry filterEntry, boolean passed) {
+    public void output(Site filterEntry, boolean passed) {
         String outputString = null;
         if (filteredWriter != null && !passed) {
             outputString = buildOutput(filterEntry);
@@ -211,4 +215,9 @@ abstract public class BaseFilter implements Filter {
             }
         }        
     }    
+    
+    public MosaicHunterContext getContext() {
+        return context;
+    }
+    
 }

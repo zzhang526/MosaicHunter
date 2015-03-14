@@ -2,9 +2,11 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 
 import net.sf.samtools.SAMRecord;
 import cn.edu.pku.cbi.mosaichunter.BamSiteReader;
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
-import cn.edu.pku.cbi.mosaichunter.ReferenceManager;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
+import cn.edu.pku.cbi.mosaichunter.reference.ReferenceManager;
 
 public class SysCallFilter extends BaseFilter {
    
@@ -20,13 +22,13 @@ public class SysCallFilter extends BaseFilter {
     
     public SysCallFilter(String name) {
         this(name,
-             ConfigManager.getInstance().getDoubles(name, "base0"),
-             ConfigManager.getInstance().getDoubles(name, "base1"),
-             ConfigManager.getInstance().getDoubles(name, "base2"),
-             ConfigManager.getInstance().getDouble(name, "intercept"),
-             ConfigManager.getInstance().getDouble(name, "diff_err_diff_dir"),
-             ConfigManager.getInstance().getDouble(name, "diff_error_dir"),
-             ConfigManager.getInstance().getDouble(name, "t_test"));
+             ConfigManager.getInstance().getDoubles(getNamesapce(name) , "base0"),
+             ConfigManager.getInstance().getDoubles(getNamesapce(name) , "base1"),
+             ConfigManager.getInstance().getDoubles(getNamesapce(name) , "base2"),
+             ConfigManager.getInstance().getDouble(getNamesapce(name) , "intercept"),
+             ConfigManager.getInstance().getDouble(getNamesapce(name) , "diff_err_diff_dir"),
+             ConfigManager.getInstance().getDouble(getNamesapce(name) , "diff_error_dir"),
+             ConfigManager.getInstance().getDouble(getNamesapce(name) , "t_test"));
     }
     
     public SysCallFilter(String name, 
@@ -42,14 +44,30 @@ public class SysCallFilter extends BaseFilter {
         this.tTestWeight = tTest;
     }        
     
+    private static String getNamesapce(String name) {
+        int depth = ConfigManager.getInstance().getInt(name, "depth", -1);
+        int[] depths = ConfigManager.getInstance().getInts(name, "training_depths");
+        if (depth < 0 || depths.length == 0) {
+            return name;
+        }
+        int d = depths[0];
+        for (int i = 1; i < depths.length; ++i) {
+            if (Math.abs(depth - d) > Math.abs(depth - depths[i])) {
+                d = depths[i];
+            }
+        }
+        return name + "." + d;
+    }
+    
     @Override
-    public void init() throws Exception {
-        super.init();
+    public void init(MosaicHunterContext context) throws Exception {
+        super.init(context);
         
         String inputFile = ConfigManager.getInstance().get(null, "input_file", null);
         String indexFile = ConfigManager.getInstance().get(null, "index_file", null);
         int maxDepth = ConfigManager.getInstance().getInt(null, "max_depth");
-        siteReader = new BamSiteReader(inputFile, indexFile, maxDepth, 0, 0);
+        siteReader = new BamSiteReader(
+                getContext().getReferenceManager(), inputFile, indexFile, maxDepth, 0, 0);
         siteReader.init();
     }
     
@@ -59,11 +77,11 @@ public class SysCallFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
-        FilterEntry site;
+    public boolean doFilter(Site filterEntry) {
+        Site site;
         try {
             site = siteReader.read(
-                    filterEntry.getChrName(), filterEntry.getRefPos(), filterEntry.getRef(), null);
+                    filterEntry.getRefName(), filterEntry.getRefPos(), filterEntry.getRef(), null);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
@@ -93,7 +111,7 @@ public class SysCallFilter extends BaseFilter {
         altPosCount = site.getPositiveAlleleCount() - refPosCount;
         altNegCount = site.getNegativeAlleleCount() - refNegCount;
         
-        String refName = site.getChrName();
+        String refName = site.getRefName();
         double altPosAf = (double) altPosCount / (altPosCount + refPosCount);
         double altNegAf = (double) altNegCount / (altNegCount + refNegCount);
         double altAf;
@@ -101,7 +119,7 @@ public class SysCallFilter extends BaseFilter {
         byte base1;
         byte base2;
         
-        ReferenceManager referenceManager = filterEntry.getReferenceManager();
+        ReferenceManager referenceManager = getContext().getReferenceManager();
         if (altPosAf > altNegAf) {
             base2 = referenceManager.getBase(refName, refPos - 2);
             base1 = referenceManager.getBase(refName, refPos - 1);
@@ -163,9 +181,9 @@ public class SysCallFilter extends BaseFilter {
         double tTest = diffSum / Math.sqrt((n * diff2Sum - diffSum * diffSum) / (n - 1));
         
         double[] feature = new double[7];
-        feature[0] = base2Weight[MosaicHunterHelper.getBaseId(base2)];
-        feature[1] = base1Weight[MosaicHunterHelper.getBaseId(base1)];
-        feature[2] = base0Weight[MosaicHunterHelper.getBaseId(base0)];
+        feature[0] = base2Weight[MosaicHunterHelper.BASE_TO_ID[base2]];
+        feature[1] = base1Weight[MosaicHunterHelper.BASE_TO_ID[base1]];
+        feature[2] = base0Weight[MosaicHunterHelper.BASE_TO_ID[base0]];
         feature[3] = afDiff * afDiffWeight;
         feature[4] = altAf * altAfWeight;
         feature[5] = tTest * tTestWeight;

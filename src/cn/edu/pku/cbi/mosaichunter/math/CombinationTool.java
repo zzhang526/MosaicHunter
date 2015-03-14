@@ -1,19 +1,18 @@
 package cn.edu.pku.cbi.mosaichunter.math;
 
-import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
-
 public class CombinationTool {
     
-    public static final int DEFAULT_MAX_N = 1000;
+    public static final int DEFAULT_MAX = 10000000;
+    public static final int DEFAULT_MAX_CACHED = 2000;
     
-    private static double[][] c = null;
-    
+    private static double[][] c = new double[DEFAULT_MAX_CACHED + 1][DEFAULT_MAX_CACHED + 1];
+    private static double[] logFactorial = new double[DEFAULT_MAX + 1];
+
     static {
-        int n = ConfigManager.getInstance().getInt(null, "max_depth", DEFAULT_MAX_N);
-        if (n < DEFAULT_MAX_N) {
-            n = DEFAULT_MAX_N;
+        logFactorial[0] = 0.0;
+        for (int i = 1; i < logFactorial.length; i++) {
+            logFactorial[i] = logFactorial[i-1] + Math.log(i);
         }
-        c = new double[n * 2 + 1][n * 2 + 1];
     }
 
     private CombinationTool() {
@@ -25,14 +24,34 @@ public class CombinationTool {
         if (n > m) {
             throw new IllegalArgumentException("n(" + n + ") exceeds m( " +  m + ")");            
         }
-        if (m > c.length) {
-            throw new IllegalArgumentException("m(" + m + ") exceeds limit " +  c.length);            
+        if (n < 0) {
+            throw new IllegalArgumentException("n(" + n + ") is less than zero");            
+        }
+        if (m < c.length) {
+            return calc(m, n);
+        } else if (m < logFactorial.length) {
+            return Math.exp(logFactorial[m] - logFactorial[m - n] - logFactorial[n]);
+        } else {
+            throw new IllegalArgumentException(
+                    "m(" + m + ") exceeds limit " +  logFactorial.length);            
+        }
+    }
+    
+    public static double cLog(int m, int n) {
+        if (n > m) {
+            throw new IllegalArgumentException("n(" + n + ") exceeds m( " +  m + ")");            
         }
         if (n < 0) {
             throw new IllegalArgumentException("n(" + n + ") is less than zero");            
         }
-        return calc(m, n);       
+        if (m < logFactorial.length) {
+            return logFactorial[m] - logFactorial[m - n] - logFactorial[n];
+        } else {
+            throw new IllegalArgumentException(
+                    "m(" + m + ") exceeds limit " +  logFactorial.length);            
+        }
     }
+    
     
     private static double calc(int m, int n) {
         if (c[m][n] > 0) {

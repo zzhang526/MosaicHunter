@@ -3,6 +3,8 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class OrFilter extends BaseFilter {
@@ -21,10 +23,10 @@ public class OrFilter extends BaseFilter {
     }
     
     @Override
-    public void init() throws Exception {
-        super.init();
+    public void init(MosaicHunterContext context) throws Exception {
+        super.init(context);
         for (Filter filter : filters) {
-            filter.init();
+            filter.init(context);
         }
     }
     
@@ -49,7 +51,7 @@ public class OrFilter extends BaseFilter {
     }    
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {        
+    public boolean doFilter(Site filterEntry) {        
         for (Filter filter : filters) {
             boolean result = filter.filter(filterEntry);
             if (result) {
@@ -60,9 +62,9 @@ public class OrFilter extends BaseFilter {
     }
     
     @Override
-    public List<FilterEntry> doFilter(List<FilterEntry> filterEntries) {
-        List<FilterEntry> results = new ArrayList<FilterEntry>();
-        for (FilterEntry entry : filterEntries) {
+    public List<Site> doFilter(List<Site> filterEntries) {
+        List<Site> results = new ArrayList<Site>();
+        for (Site entry : filterEntries) {
             if (doFilter(entry)) {
                 results.add(entry);
             }

@@ -8,6 +8,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class RegionFilter extends BaseFilter {
@@ -38,8 +40,8 @@ public class RegionFilter extends BaseFilter {
     
     
     @Override
-    public void init() throws Exception {
-        super.init();
+    public void init(MosaicHunterContext context) throws Exception {
+        super.init(context);
         if (bedFile == null || bedFile.isEmpty()) {
             return;
         }
@@ -81,9 +83,9 @@ public class RegionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) { 
+    public boolean doFilter(Site filterEntry) { 
         boolean inRegion = false;
-        List<Region> r = regions.get(filterEntry.getChrName());
+        List<Region> r = regions.get(filterEntry.getRefName());
         if (r != null) {
             Region pos = new Region(filterEntry.getRefPos(), filterEntry.getRefPos());        
             int index = Collections.binarySearch(r, pos);
@@ -97,7 +99,7 @@ public class RegionFilter extends BaseFilter {
                     filterEntry.setMetadata(
                             getName(),
                             new Object[] {
-                                filterEntry.getChrName(),
+                                filterEntry.getRefName(),
                                 region.start,
                                 region.end});
                 }

@@ -1,39 +1,40 @@
-package cn.edu.pku.cbi.mosaichunter.filter;
+package cn.edu.pku.cbi.mosaichunter;
 
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
-import cn.edu.pku.cbi.mosaichunter.ReadCache;
-import cn.edu.pku.cbi.mosaichunter.ReferenceManager;
-import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 
-public class FilterEntry {
+public class Site {
 
     public static final String DEFAULT_ALLELE_ID_ORDER = "ACGT";
     
-    private final SAMFileReader samFileReader;
-    private final ReadCache readCache;
-    private final ReferenceManager referenceManager;
+    private static final Map<String, int[]> alleleIdCache = new HashMap<String, int[]>();
+    private static final int[] defaultAlleleId;
+    static {
+        defaultAlleleId = getAlleleId(DEFAULT_ALLELE_ID_ORDER);
+    }
     
-    private final String chrName;
-    private final long refPos;
-    private final byte ref;
-    private final int depth;
+    private final int maxDepth; 
+
+    private final SAMRecord[] reads;
     private final byte[] bases;
     private final byte[] baseQualities;
-    private final SAMRecord[] reads;
     private final short[] basePos;
     private final Map<String, Object[]> metadata = new HashMap<String, Object[]>(); 
     private final Set<String> passedFilters = new HashSet<String>();
-    private final String alleleIdOrder;
-    private final int[] alleleId;
     private final int[] alleleCount = new int[4];
     
-    private SAMRecord[] mates;
+    private String refName;
+    private int refId;
+    private long refPos;
+    private byte ref;
+    private int depth;
+    private int realDepth;
+    private String alleleIdOrder;
+    private int[] alleleId;
     
     private byte majorAllele = -1;
     private byte minorAllele = -1;
@@ -50,52 +51,112 @@ public class FilterEntry {
     
     private String alleleCountOrder;
 
-    
-    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache, ReferenceManager referenceManager,
-            String chrName, long refPos, byte ref, int depth,
-            byte[] bases, byte[] baseQualities, SAMRecord[] reads, SAMRecord[] mates, short[] basePos) {
-        this(samFileReader, readCache, referenceManager,
-             chrName, refPos, ref, depth, bases, baseQualities, reads, mates,
-             basePos, DEFAULT_ALLELE_ID_ORDER);
+    public Site(int maxDepth) {
+        this.maxDepth = maxDepth;
+        bases = new byte[maxDepth];
+        baseQualities = new byte[maxDepth];
+        basePos = new short[maxDepth];
+        reads = new SAMRecord[maxDepth];
     }
     
-    public FilterEntry(SAMFileReader samFileReader, ReadCache readCache, ReferenceManager referenceManager,
-            String chrName, long refPos, byte ref, int depth,
-            byte[] bases, byte[] baseQualities, SAMRecord[] baseRecords, SAMRecord[] mates, short[] basePos,
+    // TODO base/baseQ
+    public Site(String refName, int refId, long refPos, byte ref, int depth, int realDepth,
+            byte[] bases, byte[] baseQualities, SAMRecord[] reads, short[] basePos) {
+        this(refName, refId, refPos, ref, depth, realDepth, bases, baseQualities, reads, basePos, null);
+    }
+    
+    public Site(String refName, int refId, long refPos, byte ref, int depth, int realDepth,
+            byte[] bases, byte[] baseQualities, SAMRecord[] reads, short[] basePos, 
             String alleleIdOrder) {
-        this.samFileReader = samFileReader;
-        this.readCache = readCache;
-        this.referenceManager = referenceManager;
-        this.chrName = chrName;
+        this.maxDepth = depth;
+        this.bases = bases;
+        this.baseQualities = baseQualities;
+        this.reads = reads;
+        this.basePos = basePos;
+        init(refName, refId, refPos, ref, depth, realDepth, alleleIdOrder);
+    }
+    
+    private static int[] getAlleleId(String alleleIdOrder) {
+        int[] alleleId = alleleIdCache.get(alleleIdOrder); 
+        if (alleleId == null) {
+            alleleId = new int[128];
+            for (int i = 0; i < alleleIdOrder.length(); ++i) {
+                alleleId[alleleIdOrder.charAt(i)] = i;
+            }
+            alleleIdCache.put(alleleIdOrder, alleleId);
+        }
+        return alleleId;
+    }
+    
+    public void init(String refName, int refId, long refPos, byte ref, int depth, int realDepth, String alleleIdOrder) {
+        this.refName = refName;
+        this.refId = refId;
         this.refPos = refPos;
         this.ref = ref;
         this.depth = depth;
-        this.bases = bases;
-        this.mates = mates;
-        this.baseQualities = baseQualities;
-        this.reads = baseRecords;
-        this.basePos = basePos;
-        this.alleleIdOrder = alleleIdOrder == null ? DEFAULT_ALLELE_ID_ORDER : alleleIdOrder;
-        alleleId = new int[128];
-        for (int i = 0; i < this.alleleIdOrder.length(); ++i) {
-            alleleId[this.alleleIdOrder.charAt(i)] = i;
+        this.realDepth = realDepth;
+        
+        if (alleleIdOrder == null) {
+            this.alleleIdOrder = DEFAULT_ALLELE_ID_ORDER;
+            this.alleleId = defaultAlleleId;
+        } else {
+            this.alleleIdOrder = alleleIdOrder;
+            this.alleleId = getAlleleId(alleleIdOrder); 
         }
+        metadata.clear();
+        passedFilters.clear();
+        alleleCount[0] = 0;
+        alleleCount[1] = 0;
+        alleleCount[2] = 0;
+        alleleCount[3] = 0;
+        
+        majorAllele = -1;
     }
     
-    public SAMFileReader getSAMFileReader() {
-        return samFileReader;
+    public void copy(Site that) {
+        init(that.refName, that.refId, that.refPos, that.ref, that.depth, that.realDepth, that.alleleIdOrder);
+        //System.arraycopy(that.bases, 0, bases, 0, depth);
+        //System.arraycopy(that.baseQualities, 0, baseQualities, 0, depth);
+        System.arraycopy(that.reads, 0, reads, 0, depth);
+        System.arraycopy(that.basePos, 0, basePos, 0, depth);
+        metadata.putAll(that.metadata);
+        passedFilters.addAll(that.passedFilters);
     }
     
-    public ReadCache getReadCache() {
-        return readCache;
+    public void increaceRealDepth() {
+        realDepth++;
     }
     
-    public ReferenceManager getReferenceManager() {
-        return referenceManager;
+    public void addRead(SAMRecord read, short pos) {
+
+        if (depth >= maxDepth) {
+            return;
+        }
+        
+        reads[depth] = read;
+        basePos[depth] = pos;
+        //bases[depth] = base;
+        //baseQualities[depth] = baseQ;
+        
+        depth++;
+        majorAllele = -1;
+        
     }
     
-    public String getChrName() {
-        return chrName;
+    public void replaceRead(int i, SAMRecord read, short pos) {
+        //bases[i] = base;
+        //baseQualities[i] = baseQ;
+        reads[i] = read;
+        basePos[i] = pos;
+        majorAllele = -1;
+    }
+    
+    public int getMaxDepth() {
+        return maxDepth;
+    }
+    
+    public String getRefName() {
+        return refName;
     }
     
     public long getRefPos() {
@@ -110,24 +171,26 @@ public class FilterEntry {
         return depth;
     }
 
+    public int getRealDepth() {
+        return realDepth;
+    }
+
     public byte[] getBases() {
+        if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
         return bases;
     }
 
     public byte[] getBaseQualities() {
+        if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
         return baseQualities;
     }
     
     public SAMRecord[] getReads() {
         return reads;
-    }
-    
-    public SAMRecord[] getMates() {
-        return mates;
-    }
-    
-    public void setMates(SAMRecord[] mates) {
-        this.mates = mates;
     }
     
     public short[] getBasePos() {
@@ -141,11 +204,7 @@ public class FilterEntry {
     public void setMetadata(String name, Object[] data) {
         metadata.put(name, data);
     }
-    
-    public Set<String> getPassedFilters() {
-        return passedFilters;
-    }
-    
+   
     public byte getMajorAllele() {
         if (majorAllele < 0) {
             calculateAlleleCounts();
@@ -244,13 +303,16 @@ public class FilterEntry {
         return alleleCountOrder;
     }
     
-    private void calculateAlleleCounts() {        
+    private void calculateAlleleCounts() {    
         int[] negativeAlleleCounts = new int[4];
 
         positiveAlleleCount = 0;
         negativeAlleleCount = 0;
         
         for (int i = 0; i < depth; ++i) { 
+            bases[i] = reads[i].getReadBases()[basePos[i]];
+            baseQualities[i] = reads[i].getBaseQualities()[basePos[i]];
+
             alleleCount[alleleId[bases[i]]]++;
             if (reads[i].getReadNegativeStrandFlag()) {
                 negativeAlleleCounts[alleleId[bases[i]]]++;
@@ -274,8 +336,8 @@ public class FilterEntry {
         
         majorAllele = (byte) alleleIdOrder.charAt(allele[0]);
         minorAllele = (byte) alleleIdOrder.charAt(allele[1]);
-        majorAlleleId = MosaicHunterHelper.getBaseId(majorAllele);
-        minorAlleleId = MosaicHunterHelper.getBaseId(minorAllele);
+        majorAlleleId = MosaicHunterHelper.BASE_TO_ID[majorAllele];
+        minorAlleleId = MosaicHunterHelper.BASE_TO_ID[minorAllele];
 
         majorAlleleCount = alleleCount[allele[0]];
         minorAlleleCount = alleleCount[allele[1]];;
@@ -289,6 +351,10 @@ public class FilterEntry {
                 alleleIdOrder.charAt(allele[1]) + 
                 alleleIdOrder.charAt(allele[2]) + 
                 alleleIdOrder.charAt(allele[3]);                 
+    }
+    
+    public Set<String> getPassedFilters() {
+        return passedFilters;
     }
 
 }

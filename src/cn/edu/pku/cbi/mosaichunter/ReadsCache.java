@@ -2,7 +2,7 @@ package cn.edu.pku.cbi.mosaichunter;
 
 import net.sf.samtools.SAMRecord;
 
-public class ReadCache {
+public class ReadsCache {
     
     public final int DEFAULT_BUCKSIZE = 51;
     
@@ -11,7 +11,7 @@ public class ReadCache {
     private final SAMRecord[][] buckets;
     private final int[] bucketIds;
 
-    public ReadCache(int bucketNumber) {
+    public ReadsCache(int bucketNumber) {
         this.bucketNumber = bucketNumber;
         bucketSize = DEFAULT_BUCKSIZE;
         buckets = new SAMRecord[bucketNumber][bucketSize];

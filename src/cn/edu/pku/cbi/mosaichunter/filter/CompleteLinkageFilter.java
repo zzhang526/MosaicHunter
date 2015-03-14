@@ -3,46 +3,53 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.math3.stat.inference.AlternativeHypothesis;
+import org.apache.commons.math3.stat.inference.BinomialTest;
+
 import net.sf.samtools.SAMRecord;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.StatsManager;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.math.FishersExactTest;
 
 public class CompleteLinkageFilter extends BaseFilter {
 
-    public static final double DEFAULT_MIN_P_VALUE = 0.01;
+    public static final double DEFAULT_MAX_P_VALUE = 0.01;
     
-    private final double minPValue;
+    private final double maxPValue;
     
     public CompleteLinkageFilter(String name) {
         this(name,
-             ConfigManager.getInstance().getDouble(name, "min_p_value", DEFAULT_MIN_P_VALUE));
+             ConfigManager.getInstance().getDouble(name, "max_p_value", DEFAULT_MAX_P_VALUE));
     }
     
-    public CompleteLinkageFilter(String name, double minPValue) {
+    public CompleteLinkageFilter(String name, double maxPValue) {
         super(name);
-        this.minPValue = minPValue;        
+        this.maxPValue = maxPValue;        
     }   
         
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {  
+    public boolean doFilter(Site filterEntry) {  
         
         SAMRecord[] reads = filterEntry.getReads();
         if (!doFilter(filterEntry, reads)) {
             return false;
         }
         
-        SAMRecord[] mates = filterEntry.getMates();
-        if (mates == null) {
-            mates = new SAMRecord[filterEntry.getDepth()];
-            filterEntry.setMates(mates);
-        }
+        SAMRecord[] mates = new SAMRecord[filterEntry.getDepth()];
+            
         for (int i = 0; i < mates.length; ++i) {
+            if (!reads[i].getReadPairedFlag()) {
+                continue;
+            }
+            
             if (mates[i] == null) {
-                mates[i] = filterEntry.getReadCache().getMate(reads[i]);
+                mates[i] = getContext().getReadsCache().getMate(reads[i]);
             }
             StatsManager.count("mate_query");
+            
+            // may cause exception for unpaired reads
             if (reads[i].getMateUnmappedFlag()) {
                 StatsManager.count("mate_unmapped");
                 if (mates[i] != null) {
@@ -50,12 +57,12 @@ public class CompleteLinkageFilter extends BaseFilter {
                 }
             } else if (mates[i] == null) {
                 StatsManager.count("mate_miss", 1);
-                SAMRecord m = filterEntry.getSAMFileReader().queryMate(reads[i]);
+                SAMRecord m = getContext().getSAMFileReader().queryMate(reads[i]);
                 if (m != null && m.getAlignmentStart() != reads[i].getAlignmentStart()) {
                     mates[i] = m;
                     StatsManager.count("mate_miss_true", 1);
                     /*
-                    System.out.println(filterEntry.getChrName() + " " + filterEntry.getRefPos());
+                    System.out.println(filterEntry.getRefName() + " " + filterEntry.getRefPos());
                     System.out.println(reads[i].getMateAlignmentStart() + " " + reads[i].getAlignmentStart());
                     System.out.println(mates[i].getMateAlignmentStart() + " " + mates[i].getAlignmentStart());
                     */
@@ -86,8 +93,8 @@ public class CompleteLinkageFilter extends BaseFilter {
         return result;
     }    
     
-    private boolean doFilter(FilterEntry filterEntry, SAMRecord[] reads) {
-        String chrName = filterEntry.getChrName();
+    private boolean doFilter(Site filterEntry, SAMRecord[] reads) {
+        String chrName = filterEntry.getRefName();
         int minReadQuality = ConfigManager.getInstance().getInt(null, "min_read_quality", 0);
         int minMappingQuality = ConfigManager.getInstance().getInt(null, "min_mapping_quality", 0);
                
@@ -96,7 +103,7 @@ public class CompleteLinkageFilter extends BaseFilter {
         Map<Integer, PositionEntry> positions = new HashMap<Integer, PositionEntry>();                
         for (int i = 0; i < filterEntry.getDepth(); ++i) {
             
-            if (reads[i] == null || !chrName.equals(MosaicHunterHelper.getChr(reads[i].getReferenceName()))) {
+            if (reads[i] == null || !chrName.equals(reads[i].getReferenceName())) {
                 continue;
             }
             byte base = filterEntry.getBases()[i];           
@@ -111,7 +118,7 @@ public class CompleteLinkageFilter extends BaseFilter {
                 if (reads[i].getMappingQuality() < minMappingQuality) {
                     continue;
                 }
-                int id = MosaicHunterHelper.getBaseId(reads[i].getReadBases()[j]);
+                int id = MosaicHunterHelper.BASE_TO_ID[reads[i].getReadBases()[j]];
                 if (id < 0) {
                     continue;
                 }             
@@ -139,21 +146,41 @@ public class CompleteLinkageFilter extends BaseFilter {
             int[] ids = MosaicHunterHelper.sortAlleleCount(entry.count);
             int majorId = ids[0];
             int minorId = ids[1];
-            if (entry.majorCount[majorId] + entry.minorCount[minorId] > 1 &&
-                entry.majorCount[minorId] + entry.minorCount[majorId] > 1) {
+            
+            //if (entry.majorCount[majorId] + entry.minorCount[minorId] > 1 &&
+            //    entry.majorCount[minorId] + entry.minorCount[majorId] > 1) {
+            //    continue;
+            //}
+            
+            // TODO: binom.test, changed by Adam_Yyx, 2015-03-09
+            int diagonalSum1 = entry.majorCount[majorId] + entry.minorCount[minorId];
+            int diagonalSum2 = entry.majorCount[minorId] + entry.minorCount[majorId];
+            int totalSum = diagonalSum1 + diagonalSum2;
+            int smallDiagonalSum = diagonalSum1;
+            if (diagonalSum2 < diagonalSum1) {
+                smallDiagonalSum = diagonalSum2;
+            }
+
+            double errorRate = 1e-3;
+            double pValueCutoff = 0.01;
+            if (new BinomialTest().binomialTest(
+                    totalSum, smallDiagonalSum, errorRate, AlternativeHypothesis.GREATER_THAN)
+                    < pValueCutoff) {
                 continue;
             }
-            
+                
             double p = FishersExactTest.twoSided(
-                    entry.majorCount[majorId],
-                    entry.majorCount[minorId],
+                    entry.majorCount[majorId], 
+                    entry.majorCount[minorId], 
                     entry.minorCount[majorId],
-                    entry.minorCount[minorId]);  
-            if (p < minPValue) {
+                    entry.minorCount[minorId]);
+            
+            
+            if (p < maxPValue) {
                 char major1 = (char) filterEntry.getMajorAllele();
                 char minor1 = (char) filterEntry.getMinorAllele();
-                char major2 = MosaicHunterHelper.idToBase(majorId);
-                char minor2 = MosaicHunterHelper.idToBase(minorId);
+                char major2 = (char) MosaicHunterHelper.ID_TO_BASE[majorId];
+                char minor2 = (char) MosaicHunterHelper.ID_TO_BASE[minorId];
                 filterEntry.setMetadata(
                         getName(),
                         new Object[] {

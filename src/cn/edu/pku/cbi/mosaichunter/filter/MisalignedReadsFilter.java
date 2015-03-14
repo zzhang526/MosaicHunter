@@ -16,6 +16,7 @@ import java.util.Set;
 
 import net.sf.samtools.AlignmentBlock;
 import net.sf.samtools.SAMRecord;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class MisalignedReadsFilter extends BaseFilter {
@@ -25,6 +26,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     public static final int DEFAULT_MIN_SIDE_DISTANCE = 15;
     public static final int DEFAULT_MIN_GAP_DISTANCE = 5;
     public static final double DEFAULT_MIN_OVERLAP_PERCENTAGE = 0.9;
+    public static final int DEFAULT_MAX_NM = 2;
         
     private final String blatParam;
     private final String outputDir;
@@ -35,6 +37,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     private final int minSideDistance;
     private final int minGapDistance;
     private final double minOverlapPercentage;
+	private final int maxNM;
     
     public MisalignedReadsFilter(String name) {
         this(name,
@@ -48,13 +51,15 @@ public class MisalignedReadsFilter extends BaseFilter {
              ConfigManager.getInstance().getInt(
                       name, "min_gap_distance", DEFAULT_MIN_GAP_DISTANCE),
              ConfigManager.getInstance().getDouble(
-                      name, "min_overlap_percentage", DEFAULT_MIN_OVERLAP_PERCENTAGE));
+                      name, "min_overlap_percentage", DEFAULT_MIN_OVERLAP_PERCENTAGE),
+			 ConfigManager.getInstance().getInt(
+                      name, "max_NM", DEFAULT_MAX_NM));
     }
     
     public MisalignedReadsFilter(String name, 
             String blatParam, String outputDir, String referenceFile,
             double maxMisalignmentPercentage, int minSideDistance, int minGapDistance, 
-            double minOverlapPercentage) {
+            double minOverlapPercentage, int maxNM) {
         super(name);
         this.blatParam = blatParam;        
         this.outputDir = outputDir;
@@ -65,10 +70,11 @@ public class MisalignedReadsFilter extends BaseFilter {
         this.minSideDistance = minSideDistance;
         this.minGapDistance = minGapDistance;
         this.minOverlapPercentage = minOverlapPercentage;
+		this.maxNM = maxNM;
     }        
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         return !doFilter(Collections.singletonList(filterEntry)).isEmpty();
     }
     
@@ -76,7 +82,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     public static int[] ac = new int[AlignmentResult.values().length];
     
     @Override
-    public List<FilterEntry> doFilter(List<FilterEntry> filterEntries) {
+    public List<Site> doFilter(List<Site> filterEntries) {
         //System.out.println(new Date() + " " + getName() + " " + filterEntries.size());
         if (filterEntries.isEmpty()) {
             return filterEntries;
@@ -86,13 +92,13 @@ public class MisalignedReadsFilter extends BaseFilter {
             int result = runBlat();
             if (result != 0) {
                 System.out.println("blat process failed(exit code: " + result + ")");
-                return new ArrayList<FilterEntry>();
+                return new ArrayList<Site>();
             }
             
             Map<String, AlignmentEntry> alignments = parsePslFile();
-            List<FilterEntry> results = new ArrayList<FilterEntry>();
+            List<Site> results = new ArrayList<Site>();
             
-            for (FilterEntry entry : filterEntries) {
+            for (Site entry : filterEntries) {
                 int misalignmentMajorCount = 0;
                 int misalignmentMinorCount = 0;
                 int[][] alignmentResultCount = new int[2][AlignmentResult.values().length];
@@ -104,9 +110,15 @@ public class MisalignedReadsFilter extends BaseFilter {
                     }
                     SAMRecord samRecord = entry.getReads()[i];
                     int readPos = entry.getBasePos()[i];
-                    AlignmentEntry alignment = alignments.get(samRecord.getReadName());
+                    String id = samRecord.getReadName();
+                    if (samRecord.getFirstOfPairFlag()) {
+                        id += "/1";
+                    } else {
+                        id += "/2";
+                    }
+                    AlignmentEntry alignment = alignments.get(id);
                     AlignmentResult r = getAlignmentResult(
-                            samRecord, entry.getChrName(), readPos, alignment);
+                            samRecord, entry.getRefName(), readPos, alignment);
                     
                     ac[r.ordinal()]++;
                     
@@ -145,7 +157,7 @@ public class MisalignedReadsFilter extends BaseFilter {
             return results;
         } catch (Exception e) {
             e.printStackTrace();
-            return new ArrayList<FilterEntry>(); 
+            return new ArrayList<Site>(); 
         }
     }    
     
@@ -156,7 +168,7 @@ public class MisalignedReadsFilter extends BaseFilter {
             return AlignmentResult.NEAR_SIDE;
         }
         Object nm = samRecord.getAttribute("NM");
-        if (nm != null && nm instanceof Integer && (Integer) nm > 2) {
+        if (nm != null && nm instanceof Integer && (Integer) nm > maxNM) {
             return AlignmentResult.NM;
         }        
         
@@ -213,20 +225,25 @@ public class MisalignedReadsFilter extends BaseFilter {
         return (double) overlap / record.getReadLength();
     }
     
-    private void createFastaFile(List<FilterEntry> filterEntries) throws IOException {
+    private void createFastaFile(List<Site> filterEntries) throws IOException {
         File dir = new File(outputDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(tmpInputFaFile));
         Set<String> done = new HashSet<String>();
-        for (FilterEntry filterEntry : filterEntries) {
+        for (Site filterEntry : filterEntries) {
             for (int i = 0; i < filterEntry.getDepth(); ++i) {
                 SAMRecord samRecord = filterEntry.getReads()[i];         
-                String id = samRecord.getReadName();                
+                String id = samRecord.getReadName();
+                if (samRecord.getFirstOfPairFlag()) {
+                    id += "/1";
+                } else {
+                    id += "/2";
+                }                
                 if (AlignmentResult.ALIGNMENT_MISSING != 
                     getAlignmentResult(
-                            samRecord, filterEntry.getChrName(), 
+                            samRecord, filterEntry.getRefName(), 
                             filterEntry.getBasePos()[i], null)) {
                     continue;
                 }
@@ -246,6 +263,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     }
     
     private int runBlat() throws IOException, InterruptedException {
+        // TODO configurable blat path
         String cmd = "blat " + blatParam + " " + referenceFile + " " + tmpInputFaFile + " " + tmpOutputPslFile;
         Runtime rt = Runtime.getRuntime();
         Process blat = rt.exec(cmd);

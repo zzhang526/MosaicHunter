@@ -63,6 +63,9 @@ public class WilcoxonRankSumTest {
         
         double p = new NormalDistribution().cumulativeProbability(z);
         double pValue = 2 * Math.min(p, 1 - p); 
+        if (Double.isNaN(pValue)) {
+            return 1;
+        }
         return pValue;
     }
 }

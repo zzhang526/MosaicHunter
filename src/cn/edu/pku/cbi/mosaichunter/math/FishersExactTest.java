@@ -1,7 +1,7 @@
 package cn.edu.pku.cbi.mosaichunter.math;
 
 public class FishersExactTest {
-    
+
     private FishersExactTest() {
         // private constructor 
     }
@@ -20,9 +20,14 @@ public class FishersExactTest {
         int ab = a + b;
         int cd = c + d;
         
-        double all = CombinationTool.c(a + b + c + d, ac);        
-        double base = CombinationTool.c(ab, a) * CombinationTool.c(cd, c) / all;
+        double all = CombinationTool.cLog(a + b + c + d, ac);     
+        
+        double base = CombinationTool.cLog(ab, a) + CombinationTool.cLog(cd, c) - all;
+        base *= 1 - 1e-8;
+
+        
         double p = 0;
+        
         
         for (int aa = 0; aa <= ac; aa++) {
             int bb = ab - aa;
@@ -34,15 +39,16 @@ public class FishersExactTest {
             if (cc < 0 || cc > ac || cc > cd) {
                 continue;
             }  
-            if (dd < 0 || dd > cd || bb > bd) {
+            if (dd < 0 || dd > cd || dd > bd) {
                 continue;
             }
             
-            double q = CombinationTool.c(ab, aa) * CombinationTool.c(cd, cc) / all;
-            if (q < base + 1e-9) {
-                p += q;
+            double q = CombinationTool.cLog(ab, aa) + CombinationTool.cLog(cd, cc) - all;
+            if (q <= base) {
+                p += Math.exp(q);
             }            
-        }                
-        return p;       
+        }    
+        return p;
     }
+   
 }

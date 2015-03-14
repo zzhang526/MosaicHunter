@@ -4,6 +4,8 @@ import java.util.Arrays;
 
 //import org.apache.commons.math3.stat.inference.WilcoxonSignedRankTest;
 
+
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.math.WilcoxonRankSumTest;
 
@@ -24,7 +26,7 @@ public class MappingQualityFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         double[] majorAlleleQualities = new double[filterEntry.getMajorAlleleCount()];
         double[] minorAlleleQualities = new double[filterEntry.getMinorAlleleCount()];
         int i1 = 0;

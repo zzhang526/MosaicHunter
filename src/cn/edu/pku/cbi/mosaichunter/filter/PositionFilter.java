@@ -3,6 +3,7 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 import java.util.HashSet;
 import java.util.Set;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class PositionFilter extends BaseFilter {
@@ -24,8 +25,8 @@ public class PositionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
-        return positions.contains(filterEntry.getChrName() + ":" + filterEntry.getRefPos());
+    public boolean doFilter(Site filterEntry) {
+        return positions.contains(filterEntry.getRefName() + ":" + filterEntry.getRefPos());
     }
     
 }

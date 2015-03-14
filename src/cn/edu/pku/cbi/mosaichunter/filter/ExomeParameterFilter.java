@@ -10,7 +10,9 @@ import java.util.List;
 
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class ExomeParameterFilter extends BaseFilter {
@@ -43,14 +45,15 @@ public class ExomeParameterFilter extends BaseFilter {
     }        
     
     @Override
-    public void init() throws IOException {
+    public void init(MosaicHunterContext context) throws Exception {
+        super.init(context);
         if (rDataFile != null) {
             rDataWriter = new FileWriter(new File(this.getOutputDir(), rDataFile));
         }
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         char refAllel;
         char altAllel;
         int ref = 0;
@@ -76,7 +79,7 @@ public class ExomeParameterFilter extends BaseFilter {
                 getName(),
                 new Object[] {altAf});
         StringBuilder sb = new StringBuilder();
-        sb.append(filterEntry.getChrName()).append('\t')
+        sb.append(filterEntry.getRefName()).append('\t')
           .append(filterEntry.getRefPos()).append('\t')
           .append(refAllel).append('\t')
           .append(altAllel).append('\t')
@@ -146,6 +149,10 @@ public class ExomeParameterFilter extends BaseFilter {
 
         
         int n = sites.size();
+        if (n == 0) {
+            System.out.println("No data.");
+            return;
+        }
         int[] depth = new int[n];
         long totalDepth = 0;
         double[] af = new double[n];

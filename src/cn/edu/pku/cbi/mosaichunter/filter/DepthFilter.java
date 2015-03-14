@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class DepthFilter extends BaseFilter {
@@ -23,7 +24,7 @@ public class DepthFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {  
+    public boolean doFilter(Site filterEntry) {  
         return filterEntry.getDepth() >= minDepth && filterEntry.getDepth() <= maxDepth;
     }
     

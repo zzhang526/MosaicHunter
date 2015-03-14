@@ -3,6 +3,7 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 import java.util.ArrayList;
 import java.util.List;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class NearMosaicFilter extends BaseFilter {
@@ -22,28 +23,28 @@ public class NearMosaicFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         return true;
     }
     
     @Override
-    public List<FilterEntry> doFilter(List<FilterEntry> filterEntries) {
-        List<FilterEntry> results = new ArrayList<FilterEntry>();
-        List<FilterEntry> pendingEntries = new ArrayList<FilterEntry>();
+    public List<Site> doFilter(List<Site> filterEntries) {
+        List<Site> results = new ArrayList<Site>();
+        List<Site> pendingEntries = new ArrayList<Site>();
         
         String lastChrName = "";
         long lastMosaicPos = -1;
-        for (FilterEntry entry : filterEntries) {
-            String chrName = entry.getChrName();
+        for (Site entry : filterEntries) {
+            String chrName = entry.getRefName();
             if (!chrName.equals(lastChrName)) {
-                pendingEntries = new ArrayList<FilterEntry>();
+                pendingEntries = new ArrayList<Site>();
                 lastMosaicPos = -1;
                 lastChrName = chrName;
             }      
            
-            if (!entry.getPassedFilters().contains("heterozygous_filter")) {
+            if (!entry.getPassedFilters().contains("mosaic_like_filter")) {
                 // add sites before current mosaic site
-                for (FilterEntry pendingEntry : pendingEntries) {
+                for (Site pendingEntry : pendingEntries) {
                     if (entry.getRefPos() - pendingEntry.getRefPos() <= distance) {
                         pendingEntry.setMetadata(
                                 getName(), 
@@ -56,7 +57,7 @@ public class NearMosaicFilter extends BaseFilter {
                 results.add(entry);
                 
                 lastMosaicPos = entry.getRefPos();
-                pendingEntries = new ArrayList<FilterEntry>();
+                pendingEntries = new ArrayList<Site>();
             } else if (lastMosaicPos > -1 && entry.getRefPos() - lastMosaicPos <= distance) {
                 // add site after last mosaic site
                 entry.setMetadata(getName(), new Object[] {entry.getRefPos() - lastMosaicPos});

@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.math.WilcoxonRankSumTest;
 
@@ -20,7 +21,7 @@ public class WithinReadPositionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {
+    public boolean doFilter(Site filterEntry) {
         double[] majorAllelePositions = new double[filterEntry.getMajorAlleleCount()];
         double[] minorAllelePositions = new double[filterEntry.getMinorAlleleCount()];
         int i1 = 0;

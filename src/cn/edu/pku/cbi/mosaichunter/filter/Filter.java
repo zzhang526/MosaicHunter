@@ -2,18 +2,23 @@ package cn.edu.pku.cbi.mosaichunter.filter;
 
 import java.util.List;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
+import cn.edu.pku.cbi.mosaichunter.Site;
+
 public interface Filter {
 
     String getName();
     
-    void init() throws Exception;
+    void init(MosaicHunterContext context) throws Exception;
     
-    boolean filter(FilterEntry filterEntry);
+    boolean filter(Site filterEntry);
     
-    List<FilterEntry> filter(List<FilterEntry> filterEntries);
+    List<Site> filter(List<Site> filterEntries);
     
     void printStats(boolean printHeader);
     
     void close() throws Exception;
+    
+    MosaicHunterContext getContext();
     
 }

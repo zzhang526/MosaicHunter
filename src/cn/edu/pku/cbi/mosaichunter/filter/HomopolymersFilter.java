@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class HomopolymersFilter extends BaseFilter {
@@ -38,7 +39,7 @@ public class HomopolymersFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {   
+    public boolean doFilter(Site filterEntry) {   
         
         long pos = filterEntry.getRefPos();
         int width = Math.max(
@@ -50,8 +51,8 @@ public class HomopolymersFilter extends BaseFilter {
         byte lastBase = 'N';
         int cnt = 0;
         for (long i = left; i <= right + 1; ++i) {
-            byte base = filterEntry.getReferenceManager().getBase(
-                    filterEntry.getChrName(), i);
+            byte base = getContext().getReferenceManager().getBase(
+                    filterEntry.getRefName(), i);
             if (base == 'N' || base != lastBase || i == right + 1) {
                 if ((cnt >= longHomopolymerLength && 
                      (i - cnt - longHomopolymerExpansion <= pos && i - 1 + longHomopolymerExpansion >= pos)) || 

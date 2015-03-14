@@ -5,6 +5,8 @@ import java.io.FileReader;
 import java.util.HashSet;
 import java.util.Set;
 
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class BlacklistFilter extends BaseFilter {
@@ -25,8 +27,8 @@ public class BlacklistFilter extends BaseFilter {
     
     
     @Override
-    public void init() throws Exception {
-        super.init();
+    public void init(MosaicHunterContext context) throws Exception {
+        super.init(context);
         if (blacklistFile == null || blacklistFile.trim().isEmpty()) {
             return;
         }
@@ -53,7 +55,7 @@ public class BlacklistFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(FilterEntry filterEntry) { 
-        return !blacklist.contains(filterEntry.getChrName() + ":" + filterEntry.getRefPos());
+    public boolean doFilter(Site filterEntry) { 
+        return !blacklist.contains(filterEntry.getRefName() + ":" + filterEntry.getRefPos());
     }
 }

@@ -1,5 +1,6 @@
 package cn.edu.pku.cbi.mosaichunter.filter;
 
+import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class OutputFilter extends BaseFilter {
@@ -17,12 +18,12 @@ public class OutputFilter extends BaseFilter {
     }
        
     @Override
-    public boolean doFilter(FilterEntry filterEntry) {  
+    public boolean doFilter(Site filterEntry) {  
         return true;
     }
     
     @Override
-    public Object[] getOutputMetadata(FilterEntry filterEntry) {
+    public Object[] getOutputMetadata(Site filterEntry) {
         if (dataName == null) {
             return null;
         }
