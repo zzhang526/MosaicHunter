@@ -26,17 +26,17 @@ public class MappingQualityFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        double[] majorAlleleQualities = new double[filterEntry.getMajorAlleleCount()];
-        double[] minorAlleleQualities = new double[filterEntry.getMinorAlleleCount()];
+    public boolean doFilter(Site site) {
+        double[] majorAlleleQualities = new double[site.getMajorAlleleCount()];
+        double[] minorAlleleQualities = new double[site.getMinorAlleleCount()];
         int i1 = 0;
         int i2 = 0;
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
-            if (filterEntry.getBases()[i] == filterEntry.getMajorAllele()) {
-                majorAlleleQualities[i1] = filterEntry.getReads()[i].getMappingQuality();
+        for (int i = 0; i < site.getDepth(); ++i) {
+            if (site.getBases()[i] == site.getMajorAllele()) {
+                majorAlleleQualities[i1] = site.getReads()[i].getMappingQuality();
                 i1++;
-            } else if (filterEntry.getBases()[i] == filterEntry.getMinorAllele()) {
-                minorAlleleQualities[i2] = filterEntry.getReads()[i].getMappingQuality();
+            } else if (site.getBases()[i] == site.getMinorAllele()) {
+                minorAlleleQualities[i2] = site.getReads()[i].getMappingQuality();
                 i2++;
             }
         }
@@ -56,7 +56,7 @@ public class MappingQualityFilter extends BaseFilter {
         //WilcoxonSignedRankTest wsrt = new WilcoxonSignedRankTest();
         
         double p = WilcoxonRankSumTest.twoSided(majorAlleleQualities, minorAlleleQualities);
-        filterEntry.setMetadata(
+        site.setMetadata(
                 getName(),
                 new Object[] {
                     majorQualities,

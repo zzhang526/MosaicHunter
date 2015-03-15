@@ -50,9 +50,9 @@ public class AndFilter extends BaseFilter {
     }    
     
     @Override
-    public boolean doFilter(Site filterEntry) {        
+    public boolean doFilter(Site site) {        
         for (Filter filter : filters) {
-            boolean result = filter.filter(filterEntry);
+            boolean result = filter.filter(site);
             if (!result) {
                 return false;
             }
@@ -61,10 +61,10 @@ public class AndFilter extends BaseFilter {
     }
     
     @Override
-    public List<Site> doFilter(List<Site> filterEntries) {
+    public List<Site> doFilter(List<Site> sites) {
         for (Filter filter : filters) {
-            filterEntries = filter.filter(filterEntries);
+            sites = filter.filter(sites);
         }
-        return filterEntries;
+        return sites;
     }    
 }

@@ -27,105 +27,105 @@ public class ClusteredFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
+    public boolean doFilter(Site site) {
         return true;
     }
     
     @Override
-    public List<Site> doFilter(List<Site> filterEntries) {
-        //System.out.println(new Date() + " " + getName() + " " + filterEntries.size());        
+    public List<Site> doFilter(List<Site> sites) {
         List<Site> filtered = new ArrayList<Site>();
-        ArrayList<Site> entries = new ArrayList<Site>();
+        ArrayList<Site> pendingSites = new ArrayList<Site>();
         String lastChr = null;
-        for (Site entry : filterEntries) {
-            if (!entry.getRefName().equals(lastChr)) {
-                filtered.addAll(process(entries));
-                lastChr = entry.getRefName();
-                entries = new ArrayList<Site>();
+        for (Site site : sites) {
+            if (!site.getRefName().equals(lastChr)) {
+                filtered.addAll(process(pendingSites));
+                lastChr = site.getRefName();
+                pendingSites = new ArrayList<Site>();
             
             }
-            entries.add(entry);
+            pendingSites.add(site);
         }
-        filtered.addAll(process(entries));
+        filtered.addAll(process(pendingSites));
         return filtered;
     }
     
-    public List<Site> process(List<Site> filterEntries) {
-        int n = filterEntries.size();
+    public List<Site> process(List<Site> sites) {
+        int n = sites.size();
         if (n < 3) {
             List<Site> passed = new ArrayList<Site>();
-            for (Site entry : filterEntries) {
-                if (!entry.getPassedFilters().contains("mosaic_like_filter")) {
-                    passed.add(entry);
+            for (Site site : sites) {
+                // TODO !!!
+                if (!site.getPassedFilters().contains("mosaic_like_filter")) {
+                    passed.add(site);
                 }
             }
             return passed;
         }
         boolean[] filterFlag = new boolean[n]; 
         
-        Site entry0 = null;
-        Site entry1 = filterEntries.get(0);
-        Site entry2 = filterEntries.get(1);
-        Site entry3 = null;
+        Site site0 = null;
+        Site site1 = sites.get(0);
+        Site site2 = sites.get(1);
+        Site site3 = null;
         
         for (int i = 2; i < n; ++i) {
-            entry3 = filterEntries.get(i);
-            if (entry3.getRefName().equals(entry1.getRefName()) && 
-                entry3.getRefPos() - entry1.getRefPos() <= innerDistance) {
+            site3 = sites.get(i);
+            if (site3.getRefName().equals(site1.getRefName()) && 
+                site3.getRefPos() - site1.getRefPos() <= innerDistance) {
                 filterFlag[i - 2] = true;
                 filterFlag[i - 1] = true;
                 filterFlag[i] = true;
-                if (entry0 != null && 
-                    entry0.getRefName().equals(entry1.getRefName()) && 
-                    entry1.getRefPos() - entry0.getRefPos() <= outerDistance) {
+                if (site0 != null && 
+                    site0.getRefName().equals(site1.getRefName()) && 
+                    site1.getRefPos() - site0.getRefPos() <= outerDistance) {
                     filterFlag[i - 3] = true;
                 }
                 if (i + 1 < n &&
-                    filterEntries.get(i + 1).getRefName().equals(entry3.getRefName()) &&
-                    filterEntries.get(i + 1).getRefPos() - entry3.getRefPos() <= outerDistance) {
+                    sites.get(i + 1).getRefName().equals(site3.getRefName()) &&
+                    sites.get(i + 1).getRefPos() - site3.getRefPos() <= outerDistance) {
                     filterFlag[i + 1] = true;
                 }
             }
-            entry0 = entry1;
-            entry1 = entry2;
-            entry2 = entry3;
+            site0 = site1;
+            site1 = site2;
+            site2 = site3;
         }
         
         List<Site> passed = new ArrayList<Site>();
         for (int i = 0; i < n; ++i) {
-            Site entry = filterEntries.get(i);
+            Site site = sites.get(i);
             String posBefore = "";
             for (int k = i - 3; k < i; ++k) {
                 if (k > 0) {
-                    Site entryBefore = filterEntries.get(k);
-                    if (entryBefore.getRefName().equals(entry.getRefName())) {
+                    Site siteBefore = sites.get(k);
+                    if (siteBefore.getRefName().equals(site.getRefName())) {
                         if (!posBefore.isEmpty()) {
                             posBefore += ",";
                         }
-                        posBefore += entryBefore.getRefPos();
+                        posBefore += siteBefore.getRefPos();
                     }
                 }
             }
             String posAfter = "";
             for (int k = i + 1; k <= i + 3; ++k) {
                 if (k < n) {
-                    Site entryAfter = filterEntries.get(k);
-                    if (entryAfter.getRefName().equals(entry.getRefName())) {
+                    Site siteAfter = sites.get(k);
+                    if (siteAfter.getRefName().equals(site.getRefName())) {
                         if (!posAfter.isEmpty()) {
                             posAfter += ",";
                         }
-                        posAfter += entryAfter.getRefPos();
+                        posAfter += siteAfter.getRefPos();
                     }
                 }
             }
             
-            entry.setMetadata(
+            site.setMetadata(
                     getName(),
                     new Object[] {
                         posBefore,
                         posAfter});
-            if (!filterFlag[i] && !entry.getPassedFilters().contains("mosaic_like_filter")) {
-                passed.add(entry);
+            if (!filterFlag[i] && !site.getPassedFilters().contains("mosaic_like_filter")) {
+                passed.add(site);
             } 
         }
         return passed;

@@ -18,16 +18,16 @@ public class OutputFilter extends BaseFilter {
     }
        
     @Override
-    public boolean doFilter(Site filterEntry) {  
+    public boolean doFilter(Site site) {  
         return true;
     }
     
     @Override
-    public Object[] getOutputMetadata(Site filterEntry) {
+    public Object[] getOutputMetadata(Site site) {
         if (dataName == null) {
             return null;
         }
-        return filterEntry.getMetadata(dataName);
+        return site.getMetadata(dataName);
     }
     
 }

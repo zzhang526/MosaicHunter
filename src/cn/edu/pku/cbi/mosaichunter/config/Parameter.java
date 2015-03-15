@@ -2,31 +2,43 @@ package cn.edu.pku.cbi.mosaichunter.config;
 
 public class Parameter {
 
+    private final String namespace;
     private final String name;
-    private final boolean optional;
-    private final String defaultValue;
+    private final boolean required;
+    private final Object defaultValue;
     private final String description;
     private final String[] details;
 
     public Parameter(
-            String name, boolean optional, String defaultValue, 
+            String namesapce, String name, boolean optional, Object defaultValue, 
+            String description) {
+        this(namesapce, name, optional, defaultValue, description, null);
+    }
+    
+    public Parameter(
+            String namesapce, String name, boolean required, Object defaultValue, 
             String description, String[] details) {
+        this.namespace = namesapce;
         this.name = name;
-        this.optional = optional;
+        this.required = required;
         this.defaultValue = defaultValue;
         this.description = description;
         this.details = details;
     }
 
+    public String getNamespace() {
+        return namespace;
+    }
+    
     public String getName() {
         return name;
     }
 
-    public boolean isOptional() {
-        return optional;
+    public boolean isRequired() {
+        return required;
     }
 
-    public String getDefaultValue() {
+    public Object getDefaultValue() {
         return defaultValue;
     }
 

@@ -100,7 +100,7 @@ public class BamSiteReader {
             }
         }
          
-        Site filterEntry = new Site(
+        Site site = new Site(
                          chr,
                          referenceManager.getReferenceId(chr),
                          position,
@@ -113,6 +113,6 @@ public class BamSiteReader {
                          basePos,
                          alleleOrder);           
         it.close();
-        return filterEntry;   
+        return site;   
     }    
 }

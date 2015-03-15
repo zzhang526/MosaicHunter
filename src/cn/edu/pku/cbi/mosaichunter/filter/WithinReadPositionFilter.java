@@ -21,28 +21,28 @@ public class WithinReadPositionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        double[] majorAllelePositions = new double[filterEntry.getMajorAlleleCount()];
-        double[] minorAllelePositions = new double[filterEntry.getMinorAlleleCount()];
+    public boolean doFilter(Site site) {
+        double[] majorAllelePositions = new double[site.getMajorAlleleCount()];
+        double[] minorAllelePositions = new double[site.getMinorAlleleCount()];
         int i1 = 0;
         int i2 = 0;
         StringBuilder majorPos = new StringBuilder();
         StringBuilder minorPos = new StringBuilder();
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
-            if (filterEntry.getBases()[i] == filterEntry.getMajorAllele()) {
-                majorAllelePositions[i1] = filterEntry.getBasePos()[i];
-                majorPos.append(i1 > 0 ? "," : "").append(filterEntry.getBasePos()[i] + 1);
+        for (int i = 0; i < site.getDepth(); ++i) {
+            if (site.getBases()[i] == site.getMajorAllele()) {
+                majorAllelePositions[i1] = site.getBasePos()[i];
+                majorPos.append(i1 > 0 ? "," : "").append(site.getBasePos()[i] + 1);
                 i1++;
             }
-            if (filterEntry.getBases()[i] == filterEntry.getMinorAllele()) {
-                minorAllelePositions[i2] = filterEntry.getBasePos()[i];
-                minorPos.append(i2 > 0 ? "," : "").append(filterEntry.getBasePos()[i] + 1);
+            if (site.getBases()[i] == site.getMinorAllele()) {
+                minorAllelePositions[i2] = site.getBasePos()[i];
+                minorPos.append(i2 > 0 ? "," : "").append(site.getBasePos()[i] + 1);
                 i2++;
             }
         }
         
         double p = WilcoxonRankSumTest.twoSided(majorAllelePositions, minorAllelePositions);
-        filterEntry.setMetadata(
+        site.setMetadata(
                 getName(),
                 new Object[] {
                     majorPos,

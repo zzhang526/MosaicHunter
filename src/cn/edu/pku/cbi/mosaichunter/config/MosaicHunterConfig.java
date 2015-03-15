@@ -7,39 +7,65 @@ public class MosaicHunterConfig {
     public static final MosaicHunterConfig GENOME = new MosaicHunterConfig(
             "genome",
             "conf/genome.properties",
-            new String[] {"mosaichunter genome help message"},
-            new String[] {"mosaichunter genome short help message"},
+            new String[] {"mosaichunter genome help message, blah, blah, blah..."},
+            new String[] {""},
             new Parameter[] {
                     Parameters.INPUT_FILE,
-                    Parameters.INPUT_FILE
+                    Parameters.REFERENCE_FILE,
+                    Parameters.MODE,
+                    Parameters.SEX,
+                    Parameters.DBSNP_FILE,
+                    Parameters.FATHER_BAM_FILE,
+                    Parameters.MOTHER_BAM_FILE,
+                    Parameters.CONTROL_BAM_FILE,
+                    Parameters.REPETITIVE_REGION_BED_FILE,
+                    Parameters.INDEL_REGION_BED_FILE,
+                    Parameters.COMMON_SITE_BED_FILE,
+                    Parameters.OUTPUT_DIR,
             });
+        
+    
     
     public static final MosaicHunterConfig EXOME = new MosaicHunterConfig(
             "exome",
             "conf/exome.properties",
-            new String[] {"mosaichunter exome help message"},
-            new String[] {"mosaichunter exome short help message"},
+            new String[] {"mosaichunter exome help message, blah, blah, blah..."},
+            new String[] {""},
             new Parameter[] {
-                    
+                    Parameters.INPUT_FILE,
+                    Parameters.REFERENCE_FILE,
+                    Parameters.MODE,
+                    Parameters.ALPHA,
+                    Parameters.BETA,
+                    Parameters.SYSCALL_DEPTH,
+                    Parameters.SEX,
+                    Parameters.DBSNP_FILE,
+                    Parameters.FATHER_BAM_FILE,
+                    Parameters.MOTHER_BAM_FILE,
+                    Parameters.CONTROL_BAM_FILE,
+                    Parameters.REPETITIVE_REGION_BED_FILE,
+                    Parameters.INDEL_REGION_BED_FILE,
+                    Parameters.COMMON_SITE_BED_FILE,
+                    Parameters.OUTPUT_DIR,
             });
     
-    public static final MosaicHunterConfig EXOME_PARAMETER = new MosaicHunterConfig(
-            "exome_parameter",
+    public static final MosaicHunterConfig EXOME_PARAMETERS = new MosaicHunterConfig(
+            "exome_parameters",
             "conf/exome_perameters.properties",
-            new String[] {"mosaichunter exome parameter help message"},
-            new String[] {"mosaichunter exome parameter short help message"},
+            new String[] {"mosaichunter exome parameters help message, blah, blah, blah..."},
+            null,
             new Parameter[] {
-                    
+                    Parameters.INPUT_FILE,
+                    Parameters.REFERENCE_FILE,
+                    Parameters.SEX,
+                    Parameters.DBSNP_FILE,
+                    Parameters.REPETITIVE_REGION_BED_FILE,
+                    Parameters.INDEL_REGION_BED_FILE,
+                    Parameters.COMMON_SITE_BED_FILE,
+                    Parameters.OUTPUT_DIR,       
             });
     
-    public static final MosaicHunterConfig CANCER = new MosaicHunterConfig(
-            "cancer",
-            "conf/cancer.properties",
-            new String[] {"mosaichunter cancer help message"},
-            new String[] {"mosaichunter cancer short help message"},
-            new Parameter[] {
-                    
-            });
+    
     
     private final String name;
     private final String configFile;
@@ -81,10 +107,8 @@ public class MosaicHunterConfig {
             return GENOME;
         } else if (EXOME.name.equalsIgnoreCase(name)) {
             return EXOME;
-        } else if (EXOME_PARAMETER.name.equalsIgnoreCase(name)) {
-            return EXOME_PARAMETER;
-        }else if (CANCER.name.equalsIgnoreCase(name)) {
-            return CANCER;
+        } else if (EXOME_PARAMETERS.name.equalsIgnoreCase(name)) {
+            return EXOME_PARAMETERS;
         } else {
             return null;
         }

@@ -22,8 +22,8 @@ abstract public class BaseFilter implements Filter {
     private final String outputDir;
     private FileWriter filteredWriter = null;
     private FileWriter passedWriter = null;
-    private long entries = 0;
-    private long passedEntries = 0;
+    private long totalSites = 0;
+    private long passedSites = 0;
     private MosaicHunterContext context;
     
     public static final DecimalFormat format = new DecimalFormat("0.00000");
@@ -43,12 +43,12 @@ abstract public class BaseFilter implements Filter {
         return name;
     }    
 
-    public long getEntries() {
-        return entries;
+    public long getTotalSites() {
+        return totalSites;
     }
     
-    public long getPassedEntries() {
-        return passedEntries;
+    public long getPassedSites() {
+        return passedSites;
     }
     
     public void init(MosaicHunterContext context) throws Exception {
@@ -85,35 +85,35 @@ abstract public class BaseFilter implements Filter {
         return outputDir;
     }
     
-    public boolean filter(Site filterEntry) {
+    public boolean filter(Site site) {
         StatsManager.start(name);
-        boolean result = doFilter(filterEntry);
-        entries++;
+        boolean result = doFilter(site);
+        totalSites++;
         if (result) {
-            filterEntry.getPassedFilters().add(getName());
-            passedEntries++;
+            site.getPassedFilters().add(getName());
+            passedSites++;
         }
-        output(filterEntry, result);
+        output(site, result);
         StatsManager.end(name);
         
         return result; 
     }
     
-    public List<Site> filter(List<Site> filterEntries) {
+    public List<Site> filter(List<Site> sites) {
         StatsManager.start(name);
-        List<Site> results = doFilter(filterEntries);
-        entries += filterEntries.size();
-        passedEntries += results.size();
+        List<Site> results = doFilter(sites);
+        totalSites += sites.size();
+        passedSites += results.size();
         if (passedWriter != null || filteredWriter != null) {
             Set<Site> passed = new HashSet<Site>();
-            for (Site filterEntry : results) {
-                output(filterEntry, true);
-                passed.add(filterEntry);
-                filterEntry.getPassedFilters().add(getName());
+            for (Site site : results) {
+                output(site, true);
+                passed.add(site);
+                site.getPassedFilters().add(getName());
             }
-            for (Site filterEntry : filterEntries) {
-                if (!passed.contains(filterEntry)) {
-                    output(filterEntry, false);
+            for (Site site : sites) {
+                if (!passed.contains(site)) {
+                    output(site, false);
                 }
             }
         }
@@ -129,53 +129,53 @@ abstract public class BaseFilter implements Filter {
         }
         System.out.println(String.format(lineFormat, 
                 name, 
-                passedEntries + "/" + entries,
-                String.format("%1$.2f", passedEntries * 100.0 / entries) + "%"));
+                passedSites + "/" + totalSites,
+                String.format("%1$.2f", passedSites * 100.0 / totalSites) + "%"));
        
     }
        
-    abstract public boolean doFilter(Site filterEntry);
+    abstract public boolean doFilter(Site site);
     
-    public List<Site> doFilter(List<Site> filterEntries) {
+    public List<Site> doFilter(List<Site> sites) {
         List<Site> results = new ArrayList<Site>();
-        for (Site entry : filterEntries) {
-            if (doFilter(entry)) {
-                results.add(entry);
+        for (Site site : sites) {
+            if (doFilter(site)) {
+                results.add(site);
             }
         }
         return results;
     }
     
-    public Object[] getOutputMetadata(Site filterEntry) {
-        return filterEntry.getMetadata(name);
+    public Object[] getOutputMetadata(Site site) {
+        return site.getMetadata(name);
     }
     
-    public String buildOutput(Site filterEntry) {
+    public String buildOutput(Site site) {
         
         StringBuilder sb = new StringBuilder();
-        sb.append(filterEntry.getRefName()).append('\t');
-        sb.append(filterEntry.getRefPos()).append('\t');
-        sb.append((char) filterEntry.getRef()).append('\t');
-        sb.append(filterEntry.getDepth()).append('\t');
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
-            char base = (char) filterEntry.getBases()[i];
-            if (filterEntry.getReads()[i].getReadNegativeStrandFlag()) {
+        sb.append(site.getRefName()).append('\t');
+        sb.append(site.getRefPos()).append('\t');
+        sb.append((char) site.getRef()).append('\t');
+        sb.append(site.getDepth()).append('\t');
+        for (int i = 0; i < site.getDepth(); ++i) {
+            char base = (char) site.getBases()[i];
+            if (site.getReads()[i].getReadNegativeStrandFlag()) {
                 base = Character.toLowerCase(base);
             }
             sb.append(base);
         }
         sb.append('\t');
         
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
-            sb.append((char) (filterEntry.getBaseQualities()[i] + 33));
+        for (int i = 0; i < site.getDepth(); ++i) {
+            sb.append((char) (site.getBaseQualities()[i] + 33));
         }
         
         sb.append('\t');
-        sb.append((char) filterEntry.getMajorAllele()).append('\t').
-            append(filterEntry.getMajorAlleleCount()).append('\t');
-        sb.append((char) filterEntry.getMinorAllele()).append('\t').
-            append(filterEntry.getMinorAlleleCount());
-        Object[] metadata = getOutputMetadata(filterEntry);
+        sb.append((char) site.getMajorAllele()).append('\t').
+            append(site.getMajorAlleleCount()).append('\t');
+        sb.append((char) site.getMinorAllele()).append('\t').
+            append(site.getMinorAlleleCount());
+        Object[] metadata = getOutputMetadata(site);
         if (metadata != null) {
             for (Object data : metadata) {
                 String s;
@@ -195,10 +195,10 @@ abstract public class BaseFilter implements Filter {
         return sb.toString();               
     }
     
-    public void output(Site filterEntry, boolean passed) {
+    public void output(Site site, boolean passed) {
         String outputString = null;
         if (filteredWriter != null && !passed) {
-            outputString = buildOutput(filterEntry);
+            outputString = buildOutput(site);
             try {
                 filteredWriter.write(outputString);
                 filteredWriter.flush();
@@ -206,7 +206,7 @@ abstract public class BaseFilter implements Filter {
                 e.printStackTrace();
             }
         } else if (passedWriter != null && passed) {
-            outputString = buildOutput(filterEntry);
+            outputString = buildOutput(site);
             try {
                 passedWriter.write(outputString);
                 passedWriter.flush();

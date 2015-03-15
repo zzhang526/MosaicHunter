@@ -51,9 +51,9 @@ public class OrFilter extends BaseFilter {
     }    
     
     @Override
-    public boolean doFilter(Site filterEntry) {        
+    public boolean doFilter(Site site) {        
         for (Filter filter : filters) {
-            boolean result = filter.filter(filterEntry);
+            boolean result = filter.filter(site);
             if (result) {
                 return true;
             }
@@ -62,11 +62,11 @@ public class OrFilter extends BaseFilter {
     }
     
     @Override
-    public List<Site> doFilter(List<Site> filterEntries) {
+    public List<Site> doFilter(List<Site> sites) {
         List<Site> results = new ArrayList<Site>();
-        for (Site entry : filterEntries) {
-            if (doFilter(entry)) {
-                results.add(entry);
+        for (Site site : sites) {
+            if (doFilter(site)) {
+                results.add(site);
             }
         }
         return results;

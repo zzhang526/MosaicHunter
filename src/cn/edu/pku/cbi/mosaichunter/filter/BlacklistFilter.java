@@ -55,7 +55,7 @@ public class BlacklistFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) { 
-        return !blacklist.contains(filterEntry.getRefName() + ":" + filterEntry.getRefPos());
+    public boolean doFilter(Site site) { 
+        return !blacklist.contains(site.getRefName() + ":" + site.getRefPos());
     }
 }

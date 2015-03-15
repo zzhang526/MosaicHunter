@@ -74,21 +74,21 @@ public class MisalignedReadsFilter extends BaseFilter {
     }        
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        return !doFilter(Collections.singletonList(filterEntry)).isEmpty();
+    public boolean doFilter(Site site) {
+        return !doFilter(Collections.singletonList(site)).isEmpty();
     }
     
     //TODO
     public static int[] ac = new int[AlignmentResult.values().length];
     
     @Override
-    public List<Site> doFilter(List<Site> filterEntries) {
-        //System.out.println(new Date() + " " + getName() + " " + filterEntries.size());
-        if (filterEntries.isEmpty()) {
-            return filterEntries;
+    public List<Site> doFilter(List<Site> sites) {
+        //System.out.println(new Date() + " " + getName() + " " + sites.size());
+        if (sites.isEmpty()) {
+            return sites;
         }
         try {
-            createFastaFile(filterEntries);
+            createFastaFile(sites);
             int result = runBlat();
             if (result != 0) {
                 System.out.println("blat process failed(exit code: " + result + ")");
@@ -98,7 +98,7 @@ public class MisalignedReadsFilter extends BaseFilter {
             Map<String, AlignmentEntry> alignments = parsePslFile();
             List<Site> results = new ArrayList<Site>();
             
-            for (Site entry : filterEntries) {
+            for (Site entry : sites) {
                 int misalignmentMajorCount = 0;
                 int misalignmentMinorCount = 0;
                 int[][] alignmentResultCount = new int[2][AlignmentResult.values().length];
@@ -225,16 +225,16 @@ public class MisalignedReadsFilter extends BaseFilter {
         return (double) overlap / record.getReadLength();
     }
     
-    private void createFastaFile(List<Site> filterEntries) throws IOException {
+    private void createFastaFile(List<Site> sites) throws IOException {
         File dir = new File(outputDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
         BufferedWriter writer = new BufferedWriter(new FileWriter(tmpInputFaFile));
         Set<String> done = new HashSet<String>();
-        for (Site filterEntry : filterEntries) {
-            for (int i = 0; i < filterEntry.getDepth(); ++i) {
-                SAMRecord samRecord = filterEntry.getReads()[i];         
+        for (Site site : sites) {
+            for (int i = 0; i < site.getDepth(); ++i) {
+                SAMRecord samRecord = site.getReads()[i];         
                 String id = samRecord.getReadName();
                 if (samRecord.getFirstOfPairFlag()) {
                     id += "/1";
@@ -243,8 +243,8 @@ public class MisalignedReadsFilter extends BaseFilter {
                 }                
                 if (AlignmentResult.ALIGNMENT_MISSING != 
                     getAlignmentResult(
-                            samRecord, filterEntry.getRefName(), 
-                            filterEntry.getBasePos()[i], null)) {
+                            samRecord, site.getRefName(), 
+                            site.getBasePos()[i], null)) {
                     continue;
                 }
   

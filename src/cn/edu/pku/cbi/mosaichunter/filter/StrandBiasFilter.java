@@ -21,19 +21,19 @@ public class StrandBiasFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
+    public boolean doFilter(Site site) {
         double p = FishersExactTest.twoSided(
-                filterEntry.getPositiveMajorAlleleCount(),
-                filterEntry.getPositiveMinorAlleleCount(),
-                filterEntry.getNegativeMajorAlleleCount(),
-                filterEntry.getNegativeMinorAlleleCount());
-        filterEntry.setMetadata(
+                site.getPositiveMajorAlleleCount(),
+                site.getPositiveMinorAlleleCount(),
+                site.getNegativeMajorAlleleCount(),
+                site.getNegativeMinorAlleleCount());
+        site.setMetadata(
                 getName(),
                 new Object[] {
-                    filterEntry.getPositiveMajorAlleleCount(), 
-                    filterEntry.getPositiveMinorAlleleCount(), 
-                    filterEntry.getNegativeMajorAlleleCount(), 
-                    filterEntry.getNegativeMinorAlleleCount(),
+                    site.getPositiveMajorAlleleCount(), 
+                    site.getPositiveMinorAlleleCount(), 
+                    site.getNegativeMajorAlleleCount(), 
+                    site.getNegativeMinorAlleleCount(),
                     p});
         
         return p >= minPValue;

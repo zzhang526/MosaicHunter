@@ -11,9 +11,9 @@ public interface Filter {
     
     void init(MosaicHunterContext context) throws Exception;
     
-    boolean filter(Site filterEntry);
+    boolean filter(Site site);
     
-    List<Site> filter(List<Site> filterEntries);
+    List<Site> filter(List<Site> sites);
     
     void printStats(boolean printHeader);
     

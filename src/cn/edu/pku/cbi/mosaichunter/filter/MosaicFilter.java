@@ -14,9 +14,11 @@ import cn.edu.pku.cbi.mosaichunter.math.FishersExactTest;
 public class MosaicFilter extends BaseFilter {
 
     public static final int DEFAULT_MAX_DEPTH = 500;
+    
     // TODO must less than 1000
     public static final int DEFAULT_ALPHA_PARAM = -1;
     public static final int DEFAULT_BETA_PARAM = -1;
+    
     public static final int DEFAULT_MIN_READ_QUALITY = 20;
     public static final int DEFAULT_MIN_MAPPING_QUALITY = 20;
 
@@ -46,22 +48,19 @@ public class MosaicFilter extends BaseFilter {
     private final int betaParam;
     private final int minReadQuality;
     private final int minMappingQuality;
+    private final String mode;
     private final String sex;
     private final double[] baseChangeRate;
     private final double mosaicThreshold;
-    private final boolean trio;
     private final String fatherBamFile;
     private final String fatherIndexFile;
     private final String motherBamFile;
     private final String motherIndexFile;
 
-    private final boolean control;
     private final String controlBamFile;
     private final String controlIndexFile;
-    private final boolean controlFisher;
     private final double controlFisherThreshold;
-    private final boolean heterozygous;
-
+    
     public final double deNovoRate;
     public final double mosaicRate;
     public final double unknownAF;
@@ -84,28 +83,26 @@ public class MosaicFilter extends BaseFilter {
     public MosaicFilter(String name) {
         this(name, ConfigManager.getInstance().getInt(null, "max_depth", DEFAULT_MAX_DEPTH), ConfigManager.getInstance().getInt(null,
                 "min_read_quality", DEFAULT_MIN_READ_QUALITY), ConfigManager.getInstance().getInt(null, "min_mapping_quality",
-                DEFAULT_MIN_MAPPING_QUALITY), ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), ConfigManager
+                DEFAULT_MIN_MAPPING_QUALITY), ConfigManager.getInstance().get("mode"), ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), ConfigManager
                 .getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), ConfigManager.getInstance().get(name, "sex", DEFAULT_SEX),
                 ConfigManager.getInstance().getDoubles(name, "base_change_rate", DEFAULT_BASE_CHANGE_RATE), ConfigManager.getInstance()
-                        .getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD), ConfigManager.getInstance().getBoolean(name,
-                        "heterozygous", false), ConfigManager.getInstance().getBoolean(name, "trio", false), ConfigManager.getInstance()
+                        .getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD), ConfigManager.getInstance()
                         .get(name, "father_bam_file", null), ConfigManager.getInstance().get(name, "father_index_file", null),
                 ConfigManager.getInstance().get(name, "mother_bam_file", null), ConfigManager.getInstance().get(name, "mother_index_file",
-                        null), ConfigManager.getInstance().getBoolean(name, "control", false), ConfigManager.getInstance().get(name,
+                        null), ConfigManager.getInstance().get(name,
                         "control_bam_file", null), ConfigManager.getInstance().get(name, "control_index_file", null), ConfigManager
                         .getInstance().getDouble(name, "case_threshold", DEFAULT_CASE_THRESHOLD), ConfigManager.getInstance().getDouble(
-                        name, "control_threshold", DEFAULT_CONTROL_THRESHOLD), ConfigManager.getInstance().getBoolean(name,
-                        "control_fisher", false), ConfigManager.getInstance().getDouble(name, "control_fisher_threshold",
+                        name, "control_threshold", DEFAULT_CONTROL_THRESHOLD), ConfigManager.getInstance().getDouble(name, "control_fisher_threshold",
                         DEFAULT_CONTROL_FISHER_THRESHOLD), ConfigManager.getInstance()
                         .getDouble(name, "de_novo_rate", DEFAULT_DE_NOVO_RATE), ConfigManager.getInstance().getDouble(name, "mosaic_rate",
                         DEFAULT_MOSAIC_RATE), ConfigManager.getInstance().getDouble(name, "unknown_af", DEFAULT_UNKNOWN_AF), ConfigManager
                         .getInstance().getDouble(name, "novel_af", DEFAULT_NOVEL_AF));
     }
 
-    public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, int alphaParam, int betaParam, String sex,
-            double[] baseChangeRate, double mosaicThreshold, boolean heterozygous, boolean trio, String fatherBamFile,
-            String fatherIndexFile, String motherBamFile, String motherIndexFile, boolean control, String controlBamFile,
-            String controlIndexFile, double caseThreshold, double controlThreshold, boolean controlFisher, double controlFisherThreshold,
+    public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, String mode, int alphaParam, int betaParam, String sex,
+            double[] baseChangeRate, double mosaicThreshold, String fatherBamFile,
+            String fatherIndexFile, String motherBamFile, String motherIndexFile, String controlBamFile,
+            String controlIndexFile, double caseThreshold, double controlThreshold, double controlFisherThreshold,
             double deNovoRate, double mosaicRate, double unknownAF, double novelAF) {
         super(name);
         this.maxDepth = maxDepth;
@@ -113,19 +110,16 @@ public class MosaicFilter extends BaseFilter {
         this.betaParam = betaParam;
         this.minReadQuality = minReadQuality;
         this.minMappingQuality = minMappingQuality;
+        this.mode = mode;
         this.sex = sex;
         this.baseChangeRate = baseChangeRate;
         this.mosaicThreshold = mosaicThreshold;
-        this.heterozygous = heterozygous;
-        this.trio = trio;
         this.fatherBamFile = fatherBamFile;
         this.fatherIndexFile = fatherIndexFile;
         this.motherBamFile = motherBamFile;
         this.motherIndexFile = motherIndexFile;
-        this.control = control;
         this.controlBamFile = controlBamFile;
         this.controlIndexFile = controlIndexFile;
-        this.controlFisher = controlFisher;
         this.controlFisherThreshold = controlFisherThreshold;
         this.deNovoRate = deNovoRate;
         this.mosaicRate = mosaicRate;
@@ -244,6 +238,23 @@ public class MosaicFilter extends BaseFilter {
         }
     }
 
+    
+    private boolean isTrio() {
+        return "trio".equalsIgnoreCase(mode);
+    }
+    
+    private boolean isHeterozygous() {
+        return "heterozygous".equalsIgnoreCase(mode);
+    }
+    
+    private boolean isPairedNaive() {
+        return "paired_naive".equalsIgnoreCase(mode);
+    }
+    
+    private boolean isPairedFisher() {
+        return "paired_fisher".equalsIgnoreCase(mode);
+    }
+    
     @Override
     public void init(MosaicHunterContext context) throws Exception {
         super.init(context);
@@ -255,14 +266,14 @@ public class MosaicFilter extends BaseFilter {
     }
 
     private void initTrio() throws Exception {
-        if (control || controlFisher) {
+        if (isPairedFisher() || isPairedNaive()) {
             if (controlBamFile == null) {
                 throw new Exception(getName() + ".control_bam_file property is missing");
             }
             controlSiteReader = new BamSiteReader(
                 getContext().getReferenceManager(), controlBamFile, controlIndexFile, maxDepth, minReadQuality, minMappingQuality);
             controlSiteReader.init();
-        } else if (trio) {
+        } else if (isTrio()) {
             if (fatherBamFile == null) {
                 throw new Exception(getName() + ".father_bam_file property is missing");
             }
@@ -345,20 +356,20 @@ public class MosaicFilter extends BaseFilter {
     public static long[] cnt = new long[255];
 
     @Override
-    public boolean doFilter(Site filterEntry) {
+    public boolean doFilter(Site site) {
 
-        if (filterEntry.getDepth() == 0) {
+        if (site.getDepth() == 0) {
             return false;
         }
 
         boolean pass = false;
-        if (control || controlFisher) {
-            pass = calcMosaicWithControl(filterEntry);
-        } else if (heterozygous) {
-            double het = calcHeterozygous(filterEntry);
+        if (isPairedNaive() || isPairedFisher()) {
+            pass = calcMosaicWithControl(site);
+        } else if (isHeterozygous()) {
+            double het = calcHeterozygous(site);
             pass = het > mosaicThreshold;
         } else {
-            double mosaic = trio ? calcTrioMosaic(filterEntry) : calcIndividualMosaic(filterEntry);
+            double mosaic = isTrio() ? calcTrioMosaic(site) : calcIndividualMosaic(site);
             pass = mosaic > mosaicThreshold;
         }
 
@@ -366,11 +377,11 @@ public class MosaicFilter extends BaseFilter {
 
     }
 
-    private boolean calcMosaicWithControl(Site filterEntry) {
+    private boolean calcMosaicWithControl(Site site) {
         Site control;
         try {
-            control = controlSiteReader.read(filterEntry.getRefName(), filterEntry.getRefPos(), filterEntry.getRef(),
-                    filterEntry.getAlleleCountOrder());
+            control = controlSiteReader.read(site.getRefName(), site.getRefPos(), site.getRef(),
+                    site.getAlleleCountOrder());
         } catch (Exception e) {
             cnt[201]++;
             return false;
@@ -380,7 +391,7 @@ public class MosaicFilter extends BaseFilter {
             return false;
         }
 
-        double[] casePosterior = calcIndividualPosterior(filterEntry, false);
+        double[] casePosterior = calcIndividualPosterior(site, false);
         double[] controlPosterior = calcIndividualPosterior(control, false);
         if (casePosterior == null) {
             cnt[202]++;
@@ -392,11 +403,11 @@ public class MosaicFilter extends BaseFilter {
         }
 
         int[] alleleCounts = new int[4];
-        int majorId = filterEntry.getMajorAlleleId();
-        int minorId = filterEntry.getMinorAlleleId();
-        alleleCounts[filterEntry.getMajorAlleleId()] = 1;
+        int majorId = site.getMajorAlleleId();
+        int minorId = site.getMinorAlleleId();
+        alleleCounts[site.getMajorAlleleId()] = 1;
         if (casePosterior[0] < casePosterior[1] || casePosterior[0] < casePosterior[3]) {
-            alleleCounts[filterEntry.getMinorAlleleId()] = 1;
+            alleleCounts[site.getMinorAlleleId()] = 1;
         }
         alleleCounts[control.getMajorAlleleId()] = 1;
         if (control.getMajorAlleleId() != majorId) {
@@ -416,24 +427,24 @@ public class MosaicFilter extends BaseFilter {
         byte majorAllele = MosaicHunterHelper.ID_TO_BASE[majorId];
         byte minorAllele = MosaicHunterHelper.ID_TO_BASE[minorId];
 
-        int a = filterEntry.getAlleleCount(majorAllele);
-        int b = filterEntry.getAlleleCount(minorAllele);
+        int a = site.getAlleleCount(majorAllele);
+        int b = site.getAlleleCount(minorAllele);
 
         /**************/
         // System.out.println(majorId + " " + (char) getBase(majorId) + " " + control.getAlleleCount(majorAllele));
         // System.out.println(minorId + " " + (char) getBase(minorId) + " " + control.getAlleleCount(minorAllele));
         // System.out.println(control.getAlleleCount()+" "+control.getAlleleCount(1)+" "+control.getAlleleCount(2)+" "+control.getAlleleCountById(3));
         // System.out.println(control.getAlleleCountOrder());
-        // System.out.println(filterEntry.getAlleleCount(0)+" "+filterEntry.getAlleleCount(1)+" "+
-        // filterEntry.getAlleleCount(2)+" "+filterEntry.getAlleleCount(3));
-        // System.out.println(filterEntry.getAlleleCountOrder());
+        // System.out.println(site.getAlleleCount(0)+" "+site.getAlleleCount(1)+" "+
+        // site.getAlleleCount(2)+" "+site.getAlleleCount(3));
+        // System.out.println(site.getAlleleCountOrder());
 
         int c = control.getAlleleCount(majorAllele);
         int d = control.getAlleleCount(minorAllele);
 
-        if (controlFisher) {
+        if (isPairedFisher()) {
             double p = FishersExactTest.twoSided(a, b, c, d);
-            filterEntry.setMetadata(getName(), new Object[] {
+            site.setMetadata(getName(), new Object[] {
                     "Case(" + (char) getBase(majorId) + ":" + a + "," + (char) getBase(minorId) + ":" + b + ")",
                     "Control(" + (char) getBase(majorId) + ":" + c + "," + (char) getBase(minorId) + ":" + d + ")", casePosterior[0],
                     casePosterior[1], casePosterior[2], casePosterior[3], controlPosterior[0], controlPosterior[1], controlPosterior[2],
@@ -442,15 +453,15 @@ public class MosaicFilter extends BaseFilter {
         }
 
         // TODO: New naive mode, added by Adam_Yyx, 2015-03-09 updated
-        double[] af = getAF(filterEntry);
+        double[] af = getAF(site);
         if (af == null) {
             return false;
         }
 
-        double[] prior = calcPrior(af, af, filterEntry, sex, majorId, minorId);
+        double[] prior = calcPrior(af, af, site, sex, majorId, minorId);
         if (prior == null)
             return false;
-        double[] caseLikelihood = calcLikelihood(filterEntry, majorId, minorId);
+        double[] caseLikelihood = calcLikelihood(site, majorId, minorId);
         double[] controlLikelihood = calcLikelihood(control, majorId, minorId);
 
         // PGM for naiveMode 1-4,
@@ -467,7 +478,7 @@ public class MosaicFilter extends BaseFilter {
         // only retain naiveMode 8
         // if (naiveMode >= 5 && naiveMode <= 8) {
         boolean isAutosome = true;
-        String chr = filterEntry.getRefName();
+        String chr = site.getRefName();
         if ((!chr.equals("X") && !chr.equals("Y")) || (chr.equals("X") && sex.equals("F"))) {
             isAutosome = true;
         } else if (chr.equals("X") && sex.equals("M")) {
@@ -525,7 +536,7 @@ public class MosaicFilter extends BaseFilter {
                 sumLog10Posterior = expAdd(sumLog10Posterior, caseControlJointPosterior[i * 4 + j]);
             }
         }
-        filterEntry.setMetadata(getName(), new Object[] {
+        site.setMetadata(getName(), new Object[] {
                 "Case(" + (char) getBase(majorId) + ":" + a + "," + (char) getBase(minorId) + ":" + b + ")",
                 "Control(" + (char) getBase(majorId) + ":" + c + "," + (char) getBase(minorId) + ":" + d + ")", caseMarginalPosterior[0],
                 caseMarginalPosterior[1], caseMarginalPosterior[2], caseMarginalPosterior[3], controlMarginalPosterior[0],
@@ -709,8 +720,8 @@ public class MosaicFilter extends BaseFilter {
         return cpd;
     }
 
-    private double calcIndividualMosaic(Site filterEntry) {
-        double[] posterior = calcIndividualPosterior(filterEntry, true);
+    private double calcIndividualMosaic(Site site) {
+        double[] posterior = calcIndividualPosterior(site, true);
         if (posterior == null) {
             return -1;
         }
@@ -718,24 +729,24 @@ public class MosaicFilter extends BaseFilter {
         return mosaic;
     }
 
-    private double calcHeterozygous(Site filterEntry) {
+    private double calcHeterozygous(Site site) {
 
-        int majorId = filterEntry.getMajorAlleleId();
-        int minorId = filterEntry.getMinorAlleleId();
+        int majorId = site.getMajorAlleleId();
+        int minorId = site.getMinorAlleleId();
 
-        double[] af = getAF(filterEntry);
+        double[] af = getAF(site);
         if (af == null) {
             return 0;
         }
 
-        double[] prior = calcPrior(af, af, filterEntry, sex, majorId, minorId);
-        double[] likelihood = calcLikelihood(filterEntry, majorId, minorId, false);
+        double[] prior = calcPrior(af, af, site, sex, majorId, minorId);
+        double[] likelihood = calcLikelihood(site, majorId, minorId, false);
         double[] posterior = calcPosterior(majorId, minorId, likelihood, prior);
         if (posterior == null) {
             return 0;
         }
 
-        filterEntry.setMetadata(getName(),
+        site.setMetadata(getName(),
                 new Object[] {
                         (char) getBase(majorId) + "(" + formatAF(af[majorId]) + "):" + (char) getBase(minorId) + "("
                                 + formatAF(af[minorId]) + ")", prior[0], prior[1], prior[2], likelihood[0], likelihood[1], likelihood[2],
@@ -745,30 +756,30 @@ public class MosaicFilter extends BaseFilter {
         return het;
     }
 
-    private double[] calcIndividualPosterior(Site filterEntry, boolean setMetadata) {
-        byte majorAllele = filterEntry.getMajorAllele();
-        byte minorAllele = filterEntry.getMinorAllele();
+    private double[] calcIndividualPosterior(Site site, boolean setMetadata) {
+        byte majorAllele = site.getMajorAllele();
+        byte minorAllele = site.getMinorAllele();
         int majorId = getBaseId((char) majorAllele);
         int minorId = getBaseId((char) minorAllele);
-        return calcIndividualPosterior(filterEntry, setMetadata, majorId, minorId);
+        return calcIndividualPosterior(site, setMetadata, majorId, minorId);
     }
 
-    private double[] calcIndividualPosterior(Site filterEntry, boolean setMetadata, int majorId, int minorId) {
+    private double[] calcIndividualPosterior(Site site, boolean setMetadata, int majorId, int minorId) {
 
-        double[] af = getAF(filterEntry);
+        double[] af = getAF(site);
         if (af == null) {
             return null;
         }
 
-        double[] prior = calcPrior(af, af, filterEntry, sex, majorId, minorId);
-        double[] likelihood = calcLikelihood(filterEntry, majorId, minorId);
+        double[] prior = calcPrior(af, af, site, sex, majorId, minorId);
+        double[] likelihood = calcLikelihood(site, majorId, minorId);
         double[] posterior = calcPosterior(majorId, minorId, likelihood, prior);
         if (posterior == null) {
             return null;
         }
 
         if (setMetadata) {
-            filterEntry.setMetadata(getName(), new Object[] {
+            site.setMetadata(getName(), new Object[] {
                     (char) getBase(majorId) + "(" + formatAF(af[majorId]) + "):" + (char) getBase(minorId) + "(" + formatAF(af[minorId])
                             + ")", prior[0], prior[1], prior[2], prior[3], likelihood[0], likelihood[1], likelihood[2], likelihood[3],
                     posterior[0], posterior[1], posterior[2], posterior[3], Math.pow(10, posterior[3]) });
@@ -795,10 +806,10 @@ public class MosaicFilter extends BaseFilter {
 
     }
 
-    private double[] calcPrior(double[] fatherAf, double[] motherAf, Site entry, String sex, int majorAlleleId, int minorAlleleId) {
+    private double[] calcPrior(double[] fatherAf, double[] motherAf, Site site, String sex, int majorAlleleId, int minorAlleleId) {
         double fatherMajorAf = fatherAf[majorAlleleId] / (fatherAf[majorAlleleId] + fatherAf[minorAlleleId]);
         double motherMajorAf = motherAf[majorAlleleId] / (motherAf[majorAlleleId] + motherAf[minorAlleleId]);
-        return calcChildBaseProb(fatherMajorAf, 1 - fatherMajorAf, motherMajorAf, 1 - motherMajorAf, entry.getRefName(), sex);
+        return calcChildBaseProb(fatherMajorAf, 1 - fatherMajorAf, motherMajorAf, 1 - motherMajorAf, site.getRefName(), sex);
     }
 
     private double[] calcChildBaseProb(double fatherMajorAf, double fatherMinorAf, double motherMajorAf, double motherMinorAf, String chr,
@@ -839,25 +850,25 @@ public class MosaicFilter extends BaseFilter {
         return new double[] { homMajor, het, homMinor, mosaic };
     }
 
-    public double[] calcLikelihood(Site filterEntry, int majorId, int minorId) {
-        return calcLikelihood(filterEntry, majorId, minorId, true);
+    public double[] calcLikelihood(Site site, int majorId, int minorId) {
+        return calcLikelihood(site, majorId, minorId, true);
     }
 
-    public double[] calcLikelihood(Site filterEntry, int majorId, int minorId, boolean calcMosaic) {
+    public double[] calcLikelihood(Site site, int majorId, int minorId, boolean calcMosaic) {
         byte majorAllele = getBase(majorId);
         byte minorAllele = getBase(minorId);
 
-        double[] p = new double[filterEntry.getDepth() + 1];
+        double[] p = new double[site.getDepth() + 1];
         p[0] = 1;
         int depth = 0;
         boolean useExp = false;
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
-            double q = Math.pow(10.0, filterEntry.getBaseQualities()[i] / -10.0);
+        for (int i = 0; i < site.getDepth(); ++i) {
+            double q = Math.pow(10.0, site.getBaseQualities()[i] / -10.0);
             double qMajor, qMinor;
-            if (filterEntry.getBases()[i] == majorAllele) {
+            if (site.getBases()[i] == majorAllele) {
                 qMajor = 1 - q;
                 qMinor = q;
-            } else if (filterEntry.getBases()[i] == minorAllele) {
+            } else if (site.getBases()[i] == minorAllele) {
                 qMajor = q;
                 qMinor = 1 - q;
             } else {
@@ -876,7 +887,7 @@ public class MosaicFilter extends BaseFilter {
             }
             p[0] = useExp ? p[0] + qMinor : p[0] * qMinor;
 
-            if (!useExp && (p[0] < 1e300 || p[depth] < 1e300 || i == filterEntry.getDepth() - 1)) {
+            if (!useExp && (p[0] < 1e300 || p[depth] < 1e300 || i == site.getDepth() - 1)) {
                 for (int k = 0; k <= depth; ++k) {
                     p[k] = log10(p[k]);
                 }
@@ -930,14 +941,14 @@ public class MosaicFilter extends BaseFilter {
         return new double[] { finalHomMajor, finalHet, finalHomMinor, finalMosaic };
     }
 
-    public double[] getAF(Site filterEntry) {
+    public double[] getAF(Site site) {
         double[] af = null;
         if (dbSnpReader != null) {
-            af = dbSnpReader.getAF(filterEntry.getRefName(), filterEntry.getRefPos());
+            af = dbSnpReader.getAF(site.getRefName(), site.getRefPos());
         }
         if (af == null) {
             cnt[4]++;
-            int refId = getBaseId((char) filterEntry.getRef());
+            int refId = getBaseId((char) site.getRef());
             if (refId < 0) {
                 cnt[5]++;
                 return null;

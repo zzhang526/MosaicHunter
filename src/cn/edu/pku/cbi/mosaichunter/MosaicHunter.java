@@ -10,29 +10,37 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.apache.commons.math3.stat.inference.AlternativeHypothesis;
-import org.apache.commons.math3.stat.inference.BinomialTest;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.config.MosaicHunterConfig;
+import cn.edu.pku.cbi.mosaichunter.config.Parameter;
 
 public class MosaicHunter {
     
     public static final String VERSION = "1.0";
     public static final String WEBSITE = "http://cbi.pku.edu.cn";
+    public static final String COMMAND = "java -jar mosaichunter.jar";
+    public static final int HELP_WIDTH = 70;
+    public static final int HELP_INDENT = 3;
 
     
     public static void main(String[] args) throws Exception {
         
-               
-       //printf(0,3, "1 12 123 1234 12345 123456 1234567 12345678 123456789 1234567890 1 12 123 1234 12345 123456 1234567 12345678 123456789 1234567890 ");
+        /*
+        args = new String[] {};
+        args = new String[] {"xxx"};        
+        args = new String[] {"help"};
+        args = new String[] {"genome"};
 
-        //printf(0,3, "       1        1         ");
+        args = new String[] {"help", "genome"};
+        args = new String[] {"help", "xxx"};
+        args = new String[] {"genome", "help"};
+        args = new String[] {"genome", "xxx"};
+        args = new String[] {"xxx", "help"};
+        args = new String[] {"xxx", "genome"};
+*/
+     
         
-        //        args = new String[] {"-C", "conf/exome.properties"};
-
-        //args = new String[] {""};
-        //args = new String[] {"genome"};
         
         String cmd1 = args.length > 0 ? getCommand(args[0]) : null;
         String cmd2 = args.length > 1 ? getCommand(args[1]) : null;
@@ -48,42 +56,31 @@ public class MosaicHunter {
             printHelpMessage();
             return;
         }
+       
         if (!loadConfiguration(args, config == null ? null : config.getConfigFile())) {
             printHelpMessage();
             return;
         }
+
         if (config != null) {
             if (isHelp(cmd2)) {
-                printHelpMessage(config);
-            } else {
-                printShortHelpMessage(config);
+                printHelpMessage(config, true);
+                return;
             }
-            return;
+            if (args.length == 1) {
+                printHelpMessage(config, false);
+                return;
+            }
         }
         
-        System.out.println("run");
-        if (true) return;
-
-        
+        // TODO validate parameters
         
         ConfigManager.getInstance().print();
         
-      
         BamScanner scanner = new BamScanner();
         scanner.scan();
         
         StatsManager.printStats();
-        
-        // TODO
-        /*
-           for (int i = 0; i < MosaicFilter.cnt.length; ++i) {
-         
-            long a = MosaicFilter.cnt[i];
-            if (a > 0) {
-                System.out.println(i + " " + a);
-            }
-        }
-*/
         
     }
     
@@ -130,6 +127,7 @@ public class MosaicHunter {
         if (properties != null) {
             ConfigManager.getInstance().putAll(properties);
         }
+
         return !ConfigManager.getInstance().getProperties().isEmpty();
     }
     
@@ -200,6 +198,10 @@ public class MosaicHunter {
         return sb.toString();
     }
     
+    private static void print() {
+        System.out.println();
+    }
+    
     private static void print(Object message) {
         System.out.println(message);
     }
@@ -211,8 +213,12 @@ public class MosaicHunter {
         System.out.println(message);
     }
     
-    private static void printf(int width, Object message) {
-        System.out.print(format(0, width, message));
+    private static void printf(Object message) {
+        System.out.print(format(HELP_INDENT, HELP_WIDTH, message));
+    }
+    
+    private static void printf(int indent, Object message) {
+        System.out.print(format(indent, HELP_WIDTH, message));
     }
     
     private static void printf(int indent, int width, String message) {
@@ -220,42 +226,72 @@ public class MosaicHunter {
     }
     
     private static void printVersion() {
-        print("12345678901234567890223456789032345678904234567890523456789062345678971234567890");
         print("MosaciHunter v" + VERSION + 
               ", a post-zygotic single nucleotide mosaicism calling tool");
     }
     
     private static void printMoreInfo() {
         print("For more infomation, please visit " + WEBSITE);
-        print("12345678901234567890223456789032345678904234567890523456789062345678971234567890");
     }
     
     private static void printHelpMessage() {
         printVersion();
         print("Usage: ");
-        print(3, "java -jar mosaichunter.jar <configuration> <options>");
+        printf(COMMAND + " <configuration> <options>");
         print("where");
-        printf(3, 70, "<configuration> could be 'genome', 'excome', 'exome_parameters', "
-                + "'paired', or you can specify your own configuration file by '-C config_file'.");
-        printf(3, 70, "Use 'java -jar mosaichunter.jar help <configuration>' "
+        printf("<configuration> could be 'genome', 'excome', 'exome_parameters', "
+                + "or you can specify your own configuration file by '-C config_file'.");
+        printf("Use '" + COMMAND + " help <configuration>' "
                 + "for help of each configuration.");
-        print("");
+        print();
         printMoreInfo();
     }
     
-    private static void printHelpMessage(MosaicHunterConfig config) {
-        System.out.println("help message for config: " + config.getName() + ", including parameters and filters, blahblahblah...");
+    private static void printHelpMessage(MosaicHunterConfig config, boolean details) {
+        printVersion();
+        print();
+        //print(config.getName());
+        if (config.getShortHelpMessages() != null) {
+            for (String msg: config.getHelpMessages()) {
+                printf(0, msg);
+            }
+        }
+        print();
+        print("Usage: ");
+        printf(COMMAND + " " + config.getName() + " -P parameter=value -P ...");
+        print();
+        print("Options:");
+        printParameters(config.getParameters());
+        print();
         
+        
+        if (details) {
+            printf("Detailed help here. blah, blah, blah...");
+        } else {
+            printf("Use '" + COMMAND + " help " + config.getName() + "' "
+                    + "for more details.");
+        }
+        print();
+        printMoreInfo();
+
     }
     
-   
-    
-    private static void printShortHelpMessage(MosaicHunterConfig config) {
-        printVersion();
-        
-        
-        System.out.println("short help message for config: " + config.getName() + ", including parameters and filters, blahblahblah...");
-        
+    private static void printParameters(Parameter[] parameters) {
+        for (Parameter p : parameters) {
+            printf((p.getNamespace() != null ? p.getNamespace() + "." : "") + p.getName());
+            StringBuilder sb = new StringBuilder();
+            sb.append(p.getDescription());
+            if (p.getDefaultValue() != null) {
+                Object value = p.getDefaultValue();
+                sb.append(" Default value is ");
+                sb.append(value instanceof String ? "'" + value + "'" : value);
+                sb.append(".");
+            } else if (p.isRequired()) {
+                sb.append(" Required.");
+            }
+            
+            printf(HELP_INDENT * 2, sb.toString());
+        }
     }
     
 }

@@ -53,41 +53,41 @@ public class ExomeParameterFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
+    public boolean doFilter(Site site) {
         char refAllel;
         char altAllel;
         int ref = 0;
         int alt = 0;
-        int depth = filterEntry.getMajorAlleleCount() + filterEntry.getMinorAlleleCount();
-        if (filterEntry.getRef() == filterEntry.getMajorAllele()) {
-            ref = filterEntry.getMajorAlleleCount();
-            alt = filterEntry.getMinorAlleleCount();
-            refAllel = (char) filterEntry.getMajorAllele();
-            altAllel = (char) filterEntry.getMinorAllele();
-            } else if (filterEntry.getRef() == filterEntry.getMinorAllele()) {
-            ref = filterEntry.getMinorAlleleCount();
-            alt = filterEntry.getMajorAlleleCount();
-            refAllel = (char) filterEntry.getMinorAllele();
-            altAllel = (char) filterEntry.getMajorAllele();
+        int depth = site.getMajorAlleleCount() + site.getMinorAlleleCount();
+        if (site.getRef() == site.getMajorAllele()) {
+            ref = site.getMajorAlleleCount();
+            alt = site.getMinorAlleleCount();
+            refAllel = (char) site.getMajorAllele();
+            altAllel = (char) site.getMinorAllele();
+            } else if (site.getRef() == site.getMinorAllele()) {
+            ref = site.getMinorAlleleCount();
+            alt = site.getMajorAlleleCount();
+            refAllel = (char) site.getMinorAllele();
+            altAllel = (char) site.getMajorAllele();
         } else {
             return false;
         }
         
         double altAf = (double) alt / depth;
         sites.add(new SimpleSite(depth, altAf));
-        filterEntry.setMetadata(
+        site.setMetadata(
                 getName(),
                 new Object[] {altAf});
         StringBuilder sb = new StringBuilder();
-        sb.append(filterEntry.getRefName()).append('\t')
-          .append(filterEntry.getRefPos()).append('\t')
+        sb.append(site.getRefName()).append('\t')
+          .append(site.getRefPos()).append('\t')
           .append(refAllel).append('\t')
           .append(altAllel).append('\t')
           .append(ref).append('\t')
           .append(alt).append('\t')
-          .append(-(Double) filterEntry.getMetadata("heterozygous_filter")[7]).append('\t')
-          .append(-(Double) filterEntry.getMetadata("heterozygous_filter")[8]).append('\t')
-          .append(-(Double) filterEntry.getMetadata("heterozygous_filter")[9]).append('\t')
+          .append(-(Double) site.getMetadata("heterozygous_filter")[7]).append('\t')
+          .append(-(Double) site.getMetadata("heterozygous_filter")[8]).append('\t')
+          .append(-(Double) site.getMetadata("heterozygous_filter")[9]).append('\t')
           .append(0).append('\t')
           .append(alt + ref).append('\n');
         

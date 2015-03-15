@@ -30,14 +30,14 @@ public class CompleteLinkageFilter extends BaseFilter {
     }   
         
     @Override
-    public boolean doFilter(Site filterEntry) {  
+    public boolean doFilter(Site site) {  
         
-        SAMRecord[] reads = filterEntry.getReads();
-        if (!doFilter(filterEntry, reads)) {
+        SAMRecord[] reads = site.getReads();
+        if (!doFilter(site, reads)) {
             return false;
         }
         
-        SAMRecord[] mates = new SAMRecord[filterEntry.getDepth()];
+        SAMRecord[] mates = new SAMRecord[site.getDepth()];
             
         for (int i = 0; i < mates.length; ++i) {
             if (!reads[i].getReadPairedFlag()) {
@@ -62,7 +62,7 @@ public class CompleteLinkageFilter extends BaseFilter {
                     mates[i] = m;
                     StatsManager.count("mate_miss_true", 1);
                     /*
-                    System.out.println(filterEntry.getRefName() + " " + filterEntry.getRefPos());
+                    System.out.println(site.getRefName() + " " + site.getRefPos());
                     System.out.println(reads[i].getMateAlignmentStart() + " " + reads[i].getAlignmentStart());
                     System.out.println(mates[i].getMateAlignmentStart() + " " + mates[i].getAlignmentStart());
                     */
@@ -89,28 +89,28 @@ public class CompleteLinkageFilter extends BaseFilter {
             }
         }
         
-        boolean result = doFilter(filterEntry, mates);
+        boolean result = doFilter(site, mates);
         return result;
     }    
     
-    private boolean doFilter(Site filterEntry, SAMRecord[] reads) {
-        String chrName = filterEntry.getRefName();
+    private boolean doFilter(Site site, SAMRecord[] reads) {
+        String chrName = site.getRefName();
         int minReadQuality = ConfigManager.getInstance().getInt(null, "min_read_quality", 0);
         int minMappingQuality = ConfigManager.getInstance().getInt(null, "min_mapping_quality", 0);
                
 
         // find out all related positions
         Map<Integer, PositionEntry> positions = new HashMap<Integer, PositionEntry>();                
-        for (int i = 0; i < filterEntry.getDepth(); ++i) {
+        for (int i = 0; i < site.getDepth(); ++i) {
             
             if (reads[i] == null || !chrName.equals(reads[i].getReferenceName())) {
                 continue;
             }
-            byte base = filterEntry.getBases()[i];           
-            if (base != filterEntry.getMajorAllele() && base != filterEntry.getMinorAllele()) {
+            byte base = site.getBases()[i];           
+            if (base != site.getMajorAllele() && base != site.getMinorAllele()) {
                 continue;
             }
-            boolean isMajor = base == filterEntry.getMajorAllele();               
+            boolean isMajor = base == site.getMajorAllele();               
             for (int j = 0; j < reads[i].getReadLength(); ++j) {
                 if (reads[i].getBaseQualities()[j] < minReadQuality) {
                     continue;
@@ -123,7 +123,7 @@ public class CompleteLinkageFilter extends BaseFilter {
                     continue;
                 }             
                 int pos = reads[i].getReferencePositionAtReadPosition(j + 1);
-                if (pos == filterEntry.getRefPos()) {
+                if (pos == site.getRefPos()) {
                     continue;
                 }
                 PositionEntry entry = positions.get(pos);
@@ -177,11 +177,11 @@ public class CompleteLinkageFilter extends BaseFilter {
             
             
             if (p < maxPValue) {
-                char major1 = (char) filterEntry.getMajorAllele();
-                char minor1 = (char) filterEntry.getMinorAllele();
+                char major1 = (char) site.getMajorAllele();
+                char minor1 = (char) site.getMinorAllele();
                 char major2 = (char) MosaicHunterHelper.ID_TO_BASE[majorId];
                 char minor2 = (char) MosaicHunterHelper.ID_TO_BASE[minorId];
-                filterEntry.setMetadata(
+                site.setMetadata(
                         getName(),
                         new Object[] {
                             pos,

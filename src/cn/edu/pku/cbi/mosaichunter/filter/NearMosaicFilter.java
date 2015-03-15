@@ -23,47 +23,47 @@ public class NearMosaicFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
+    public boolean doFilter(Site site) {
         return true;
     }
     
     @Override
-    public List<Site> doFilter(List<Site> filterEntries) {
+    public List<Site> doFilter(List<Site> sites) {
         List<Site> results = new ArrayList<Site>();
-        List<Site> pendingEntries = new ArrayList<Site>();
+        List<Site> pendingSites = new ArrayList<Site>();
         
         String lastChrName = "";
         long lastMosaicPos = -1;
-        for (Site entry : filterEntries) {
-            String chrName = entry.getRefName();
+        for (Site site : sites) {
+            String chrName = site.getRefName();
             if (!chrName.equals(lastChrName)) {
-                pendingEntries = new ArrayList<Site>();
+                pendingSites = new ArrayList<Site>();
                 lastMosaicPos = -1;
                 lastChrName = chrName;
             }      
            
-            if (!entry.getPassedFilters().contains("mosaic_like_filter")) {
+            if (!site.getPassedFilters().contains("mosaic_like_filter")) {
                 // add sites before current mosaic site
-                for (Site pendingEntry : pendingEntries) {
-                    if (entry.getRefPos() - pendingEntry.getRefPos() <= distance) {
-                        pendingEntry.setMetadata(
+                for (Site pendingSite : pendingSites) {
+                    if (site.getRefPos() - pendingSite.getRefPos() <= distance) {
+                        pendingSite.setMetadata(
                                 getName(), 
-                                new Object[] {pendingEntry.getRefPos() - entry.getRefPos()});
-                        results.add(pendingEntry);
+                                new Object[] {pendingSite.getRefPos() - site.getRefPos()});
+                        results.add(pendingSite);
                     }
                 }
                 // add current mosaic site
-                entry.setMetadata(getName(), new Object[] {0L});
-                results.add(entry);
+                site.setMetadata(getName(), new Object[] {0L});
+                results.add(site);
                 
-                lastMosaicPos = entry.getRefPos();
-                pendingEntries = new ArrayList<Site>();
-            } else if (lastMosaicPos > -1 && entry.getRefPos() - lastMosaicPos <= distance) {
+                lastMosaicPos = site.getRefPos();
+                pendingSites = new ArrayList<Site>();
+            } else if (lastMosaicPos > -1 && site.getRefPos() - lastMosaicPos <= distance) {
                 // add site after last mosaic site
-                entry.setMetadata(getName(), new Object[] {entry.getRefPos() - lastMosaicPos});
-                results.add(entry);
+                site.setMetadata(getName(), new Object[] {site.getRefPos() - lastMosaicPos});
+                results.add(site);
             } else {
-                pendingEntries.add(entry);
+                pendingSites.add(site);
             }
             
         }

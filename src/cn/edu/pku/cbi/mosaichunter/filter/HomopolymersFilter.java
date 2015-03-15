@@ -39,20 +39,20 @@ public class HomopolymersFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {   
+    public boolean doFilter(Site site) {   
         
-        long pos = filterEntry.getRefPos();
+        long pos = site.getRefPos();
         int width = Math.max(
                 longHomopolymerLength + longHomopolymerExpansion, 
                 shortHomopolymerLength + shortHomopolymerExpansion);
         
-        long left = filterEntry.getRefPos() - width + 1;
-        long right = filterEntry.getRefPos() + width - 1;
+        long left = site.getRefPos() - width + 1;
+        long right = site.getRefPos() + width - 1;
         byte lastBase = 'N';
         int cnt = 0;
         for (long i = left; i <= right + 1; ++i) {
             byte base = getContext().getReferenceManager().getBase(
-                    filterEntry.getRefName(), i);
+                    site.getRefName(), i);
             if (base == 'N' || base != lastBase || i == right + 1) {
                 if ((cnt >= longHomopolymerLength && 
                      (i - cnt - longHomopolymerExpansion <= pos && i - 1 + longHomopolymerExpansion >= pos)) || 

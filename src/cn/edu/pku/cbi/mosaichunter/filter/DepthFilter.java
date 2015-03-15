@@ -24,8 +24,8 @@ public class DepthFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {  
-        return filterEntry.getDepth() >= minDepth && filterEntry.getDepth() <= maxDepth;
+    public boolean doFilter(Site site) {  
+        return site.getDepth() >= minDepth && site.getDepth() <= maxDepth;
     }
     
 }

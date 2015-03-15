@@ -32,12 +32,12 @@ public class BaseNumberFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        return filterEntry.getMinorAlleleCount() >= minMinorAlleleNumber &&
-               filterEntry.getMinorAlleleCount() >= 
-                       filterEntry.getDepth() * minMinorAllelePercentage &&
-               filterEntry.getMinorAlleleCount() <
-                       filterEntry.getDepth() * maxMinorAllelePercentage;
+    public boolean doFilter(Site site) {
+        return site.getMinorAlleleCount() >= minMinorAlleleNumber &&
+               site.getMinorAlleleCount() >= 
+                       site.getDepth() * minMinorAllelePercentage &&
+               site.getMinorAlleleCount() <
+                       site.getDepth() * maxMinorAllelePercentage;
     }
     
 }

@@ -77,17 +77,17 @@ public class SysCallFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        Site site;
+    public boolean doFilter(Site site) {
+        Site rawSite;
         try {
-            site = siteReader.read(
-                    filterEntry.getRefName(), filterEntry.getRefPos(), filterEntry.getRef(), null);
+            rawSite = siteReader.read(
+                    site.getRefName(), site.getRefPos(), site.getRef(), null);
         } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
         
-        int refPos = (int) site.getRefPos();
+        int refPos = (int) rawSite.getRefPos();
         if (refPos < 3) {
             return false;
         }
@@ -97,21 +97,21 @@ public class SysCallFilter extends BaseFilter {
         int refNegCount;
         int altNegCount;
         
-        if (site.getMajorAllele() == site.getRef()) {
-            refPosCount = site.getPositiveMajorAlleleCount();
-            refNegCount = site.getNegativeMajorAlleleCount();
+        if (rawSite.getMajorAllele() == rawSite.getRef()) {
+            refPosCount = rawSite.getPositiveMajorAlleleCount();
+            refNegCount = rawSite.getNegativeMajorAlleleCount();
             
-        } else if (site.getMinorAllele() == site.getRef()) {
-            refPosCount = site.getPositiveMinorAlleleCount();
-            refNegCount = site.getNegativeMinorAlleleCount();
+        } else if (rawSite.getMinorAllele() == rawSite.getRef()) {
+            refPosCount = rawSite.getPositiveMinorAlleleCount();
+            refNegCount = rawSite.getNegativeMinorAlleleCount();
         } else {
             // TODO?
             return false;
         }
-        altPosCount = site.getPositiveAlleleCount() - refPosCount;
-        altNegCount = site.getNegativeAlleleCount() - refNegCount;
+        altPosCount = rawSite.getPositiveAlleleCount() - refPosCount;
+        altNegCount = rawSite.getNegativeAlleleCount() - refNegCount;
         
-        String refName = site.getRefName();
+        String refName = rawSite.getRefName();
         double altPosAf = (double) altPosCount / (altPosCount + refPosCount);
         double altNegAf = (double) altNegCount / (altNegCount + refNegCount);
         double altAf;
@@ -123,12 +123,12 @@ public class SysCallFilter extends BaseFilter {
         if (altPosAf > altNegAf) {
             base2 = referenceManager.getBase(refName, refPos - 2);
             base1 = referenceManager.getBase(refName, refPos - 1);
-            base0 = site.getRef();
+            base0 = rawSite.getRef();
             altAf = altPosAf;
         } else {
             base2 = getComplementaryBase(referenceManager.getBase(refName, refPos + 2));
             base1 = getComplementaryBase(referenceManager.getBase(refName, refPos + 1));
-            base0 = getComplementaryBase(site.getRef());
+            base0 = getComplementaryBase(rawSite.getRef());
             altAf = altNegAf;
         }
         
@@ -146,9 +146,9 @@ public class SysCallFilter extends BaseFilter {
         double diff2Sum = 0;
         
         int n = 0;
-        for (int i = 0; i < site.getDepth(); ++i) {
-            SAMRecord r = site.getReads()[i];
-            int pos = site.getBasePos()[i];
+        for (int i = 0; i < rawSite.getDepth(); ++i) {
+            SAMRecord r = rawSite.getReads()[i];
+            int pos = rawSite.getBasePos()[i];
             int nextPos = tTestNegStrand ? pos - 1 : pos + 1;
             if (r.getReadNegativeStrandFlag() == tTestNegStrand &&
                 nextPos < r.getReadLength() && nextPos >= 0) {
@@ -196,7 +196,7 @@ public class SysCallFilter extends BaseFilter {
         
         double p = 1 / (1 + Math.exp(-featureSum));
         
-        filterEntry.setMetadata(
+        site.setMetadata(
                 getName(),
                 new Object[] {
                     refPosCount,

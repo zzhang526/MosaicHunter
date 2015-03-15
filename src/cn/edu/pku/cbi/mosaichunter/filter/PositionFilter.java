@@ -25,8 +25,8 @@ public class PositionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) {
-        return positions.contains(filterEntry.getRefName() + ":" + filterEntry.getRefPos());
+    public boolean doFilter(Site site) {
+        return positions.contains(site.getRefName() + ":" + site.getRefPos());
     }
     
 }

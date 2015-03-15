@@ -83,23 +83,23 @@ public class RegionFilter extends BaseFilter {
     }
     
     @Override
-    public boolean doFilter(Site filterEntry) { 
+    public boolean doFilter(Site site) { 
         boolean inRegion = false;
-        List<Region> r = regions.get(filterEntry.getRefName());
+        List<Region> r = regions.get(site.getRefName());
         if (r != null) {
-            Region pos = new Region(filterEntry.getRefPos(), filterEntry.getRefPos());        
+            Region pos = new Region(site.getRefPos(), site.getRefPos());        
             int index = Collections.binarySearch(r, pos);
             if (index < 0) {
                 index = -index - 2;
             }
             if (index >= 0) {   
                 Region region = r.get(index);
-                inRegion = (region.end >= filterEntry.getRefPos());
+                inRegion = (region.end >= site.getRefPos());
                 if (inRegion) {
-                    filterEntry.setMetadata(
+                    site.setMetadata(
                             getName(),
                             new Object[] {
-                                filterEntry.getRefName(),
+                                site.getRefName(),
                                 region.start,
                                 region.end});
                 }
