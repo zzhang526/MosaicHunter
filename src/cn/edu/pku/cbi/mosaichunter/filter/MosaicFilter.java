@@ -83,7 +83,7 @@ public class MosaicFilter extends BaseFilter {
     public MosaicFilter(String name) {
         this(name, ConfigManager.getInstance().getInt(null, "max_depth", DEFAULT_MAX_DEPTH), ConfigManager.getInstance().getInt(null,
                 "min_read_quality", DEFAULT_MIN_READ_QUALITY), ConfigManager.getInstance().getInt(null, "min_mapping_quality",
-                DEFAULT_MIN_MAPPING_QUALITY), ConfigManager.getInstance().get("mode"), ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), ConfigManager
+                DEFAULT_MIN_MAPPING_QUALITY), ConfigManager.getInstance().get(name, "mode"), ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), ConfigManager
                 .getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), ConfigManager.getInstance().get(name, "sex", DEFAULT_SEX),
                 ConfigManager.getInstance().getDoubles(name, "base_change_rate", DEFAULT_BASE_CHANGE_RATE), ConfigManager.getInstance()
                         .getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD), ConfigManager.getInstance()
