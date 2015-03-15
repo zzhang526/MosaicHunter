@@ -51,7 +51,7 @@ public class MosaicHunterConfig {
     
     public static final MosaicHunterConfig EXOME_PARAMETERS = new MosaicHunterConfig(
             "exome_parameters",
-            "conf/exome_perameters.properties",
+            "conf/exome_parameters.properties",
             new String[] {"mosaichunter exome parameters help message, blah, blah, blah..."},
             null,
             new Parameter[] {

@@ -43,7 +43,8 @@ public class MisalignedReadsFilter extends BaseFilter {
         this(name,
              ConfigManager.getInstance().get(name, "blat_param", DEFAULT_BLAT_PARAM),
              ConfigManager.getInstance().get(null, "output_dir", "."),
-             ConfigManager.getInstance().get(name, "reference_file", null),
+             ConfigManager.getInstance().get(name, "reference_file", 
+                     ConfigManager.getInstance().get(null, "reference_file", null)),
              ConfigManager.getInstance().getDouble(
                      name, "max_misalignment_percentage", DEFAULT_MAX_MISALIGNMENT_PERCENTAGE),
              ConfigManager.getInstance().getInt(
