@@ -11,18 +11,18 @@ import cn.edu.pku.cbi.mosaichunter.math.WilcoxonRankSumTest;
 
 public class MappingQualityFilter extends BaseFilter {
 
-    public static final double DEFAULT_MIN_P_VALUE = 0.05;
+    public static final double DEFAULT_P_VALUE_CUTOFF = 0.05;
     
-    private final double minPValue;
+    private final double pValueCutoff;
     
     public MappingQualityFilter(String name) {
         this(name,
-             ConfigManager.getInstance().getDouble(name, "min_p_value", DEFAULT_MIN_P_VALUE));
+             ConfigManager.getInstance().getDouble(name, "p_value_cutoff", DEFAULT_P_VALUE_CUTOFF));
     }
     
-    public MappingQualityFilter(String name, double minPValue) {
+    public MappingQualityFilter(String name, double pValueCutoff) {
         super(name);
-        this.minPValue = minPValue;        
+        this.pValueCutoff = pValueCutoff;        
     }
     
     @Override
@@ -62,7 +62,7 @@ public class MappingQualityFilter extends BaseFilter {
                     majorQualities,
                     minorQualities,
                     p});
-        return p >= minPValue;
+        return p >= pValueCutoff;
     }
     
 }

@@ -15,18 +15,30 @@ import cn.edu.pku.cbi.mosaichunter.math.FishersExactTest;
 
 public class CompleteLinkageFilter extends BaseFilter {
 
-    public static final double DEFAULT_MAX_P_VALUE = 0.01;
+    public static final double DEFAULT_BINOM_ERROR_RATE = 1e-3;
+    public static final double DEFAULT_BINOM_P_VALUE_CUTOFF = 0.01;
+    public static final double DEFAULT_FISHER_P_VALUE_CUTOFF = 0.01;
     
-    private final double maxPValue;
+    private final double binomErrorRate;
+    private final double binomPValueCutoff;
+    private final double fisherPValueCutoff;
     
     public CompleteLinkageFilter(String name) {
         this(name,
-             ConfigManager.getInstance().getDouble(name, "max_p_value", DEFAULT_MAX_P_VALUE));
+             ConfigManager.getInstance().getDouble(
+                     name, "binom_error_rate", DEFAULT_BINOM_ERROR_RATE),
+             ConfigManager.getInstance().getDouble(
+                     name, "binom_p_value_cutoff", DEFAULT_BINOM_P_VALUE_CUTOFF),
+             ConfigManager.getInstance().getDouble(
+                     name, "fisher_p_value_cutoff", DEFAULT_FISHER_P_VALUE_CUTOFF));
     }
     
-    public CompleteLinkageFilter(String name, double maxPValue) {
+    public CompleteLinkageFilter(String name, 
+            double binomErrorRate, double binomPValueCutoff, double fisherPValueCutoff) {
         super(name);
-        this.maxPValue = maxPValue;        
+        this.binomErrorRate = binomErrorRate;       
+        this.binomPValueCutoff = binomPValueCutoff;        
+        this.fisherPValueCutoff = fisherPValueCutoff;        
     }   
         
     @Override
@@ -161,11 +173,9 @@ public class CompleteLinkageFilter extends BaseFilter {
                 smallDiagonalSum = diagonalSum2;
             }
 
-            double errorRate = 1e-3;
-            double pValueCutoff = 0.01;
             if (new BinomialTest().binomialTest(
-                    totalSum, smallDiagonalSum, errorRate, AlternativeHypothesis.GREATER_THAN)
-                    < pValueCutoff) {
+                    totalSum, smallDiagonalSum, this.binomErrorRate, AlternativeHypothesis.GREATER_THAN)
+                    < binomPValueCutoff) {
                 continue;
             }
                 
@@ -176,7 +186,7 @@ public class CompleteLinkageFilter extends BaseFilter {
                     entry.minorCount[minorId]);
             
             
-            if (p < maxPValue) {
+            if (p < fisherPValueCutoff) {
                 char major1 = (char) site.getMajorAllele();
                 char minor1 = (char) site.getMinorAllele();
                 char major2 = (char) MosaicHunterHelper.ID_TO_BASE[majorId];
