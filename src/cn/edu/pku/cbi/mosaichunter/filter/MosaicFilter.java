@@ -72,7 +72,7 @@ public class MosaicFilter extends BaseFilter {
     public double[] log10_genotypeChangeRate_autosome = new double[16];
     public final double[] genotypeChangeRate_maleSexChr = new double[16];
     public double[] log10_genotypeChangeRate_maleSexChr = new double[16];
-    public final boolean yyxDebug = true;
+    public final boolean yyxDebug = false;
 
     private DbSnpReader dbSnpReader = null;
     private BamSiteReader fatherSiteReader = null;
@@ -110,7 +110,7 @@ public class MosaicFilter extends BaseFilter {
         this.betaParam = betaParam;
         this.minReadQuality = minReadQuality;
         this.minMappingQuality = minMappingQuality;
-        this.mode = mode;
+        this.mode = mode == null ? "single" : mode.trim();
         this.sex = sex;
         this.baseChangeRate = baseChangeRate;
         this.mosaicThreshold = mosaicThreshold;

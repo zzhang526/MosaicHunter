@@ -266,6 +266,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     private int runBlat() throws IOException, InterruptedException {
         // TODO configurable blat path
         String cmd = "blat " + blatParam + " " + referenceFile + " " + tmpInputFaFile + " " + tmpOutputPslFile;
+        System.out.println("run blat: " + cmd);
         Runtime rt = Runtime.getRuntime();
         Process blat = rt.exec(cmd);
         return blat.waitFor();                
