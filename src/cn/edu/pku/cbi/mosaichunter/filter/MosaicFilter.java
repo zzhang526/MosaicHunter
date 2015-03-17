@@ -24,8 +24,6 @@ public class MosaicFilter extends BaseFilter {
 
     public static final String DEFAULT_SEX = "M";
     public static final double DEFAULT_MOSAIC_THRESHOLD = 0.05;
-    public static final double DEFAULT_CASE_THRESHOLD = 0.05;
-    public static final double DEFAULT_CONTROL_THRESHOLD = 0.5;
     public static final double DEFAULT_CONTROL_FISHER_THRESHOLD = 0.01;
 
     public static final int MAX_QUALITY = 64;
@@ -90,9 +88,7 @@ public class MosaicFilter extends BaseFilter {
                         .get(name, "father_bam_file", null), ConfigManager.getInstance().get(name, "father_index_file", null),
                 ConfigManager.getInstance().get(name, "mother_bam_file", null), ConfigManager.getInstance().get(name, "mother_index_file",
                         null), ConfigManager.getInstance().get(name,
-                        "control_bam_file", null), ConfigManager.getInstance().get(name, "control_index_file", null), ConfigManager
-                        .getInstance().getDouble(name, "case_threshold", DEFAULT_CASE_THRESHOLD), ConfigManager.getInstance().getDouble(
-                        name, "control_threshold", DEFAULT_CONTROL_THRESHOLD), ConfigManager.getInstance().getDouble(name, "control_fisher_threshold",
+                        "control_bam_file", null), ConfigManager.getInstance().get(name, "control_index_file", null), ConfigManager.getInstance().getDouble(name, "control_fisher_threshold",
                         DEFAULT_CONTROL_FISHER_THRESHOLD), ConfigManager.getInstance()
                         .getDouble(name, "de_novo_rate", DEFAULT_DE_NOVO_RATE), ConfigManager.getInstance().getDouble(name, "mosaic_rate",
                         DEFAULT_MOSAIC_RATE), ConfigManager.getInstance().getDouble(name, "unknown_af", DEFAULT_UNKNOWN_AF), ConfigManager
@@ -102,7 +98,7 @@ public class MosaicFilter extends BaseFilter {
     public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, String mode, int alphaParam, int betaParam, String sex,
             double[] baseChangeRate, double mosaicThreshold, String fatherBamFile,
             String fatherIndexFile, String motherBamFile, String motherIndexFile, String controlBamFile,
-            String controlIndexFile, double caseThreshold, double controlThreshold, double controlFisherThreshold,
+            String controlIndexFile, double controlFisherThreshold,
             double deNovoRate, double mosaicRate, double unknownAF, double novelAF) {
         super(name);
         this.maxDepth = maxDepth;
