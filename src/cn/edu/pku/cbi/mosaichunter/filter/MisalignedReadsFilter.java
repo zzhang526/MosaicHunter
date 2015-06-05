@@ -27,6 +27,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     public static final int DEFAULT_MIN_GAP_DISTANCE = 5;
     public static final double DEFAULT_MIN_OVERLAP_PERCENTAGE = 0.9;
     public static final int DEFAULT_MAX_NM = 2;
+    public static final boolean DEFAULT_ENABLE_BLAT = true;
         
     private final String blatParam;
     private final String outputDir;
@@ -38,7 +39,8 @@ public class MisalignedReadsFilter extends BaseFilter {
     private final int minGapDistance;
     private final double minOverlapPercentage;
 	private final int maxNM;
-    
+    private final boolean enableBlat;
+
     public MisalignedReadsFilter(String name) {
         this(name,
              ConfigManager.getInstance().get(name, "blat_param", DEFAULT_BLAT_PARAM),
@@ -55,13 +57,15 @@ public class MisalignedReadsFilter extends BaseFilter {
              ConfigManager.getInstance().getDouble(
                       name, "min_overlap_percentage", DEFAULT_MIN_OVERLAP_PERCENTAGE),
 			 ConfigManager.getInstance().getInt(
-                      name, "max_NM", DEFAULT_MAX_NM));
+                      name, "max_NM", DEFAULT_MAX_NM),
+             ConfigManager.getInstance().getBoolean(
+                name, "enable_blat", DEFAULT_ENABLE_BLAT));
     }
     
     public MisalignedReadsFilter(String name, 
             String blatParam, String outputDir, String referenceFile,
             double maxMisalignmentPercentage, int minSideDistance, int minGapDistance, 
-            double minOverlapPercentage, int maxNM) {
+            double minOverlapPercentage, int maxNM, boolean enableBlat) {
         super(name);
         this.blatParam = blatParam;        
         this.outputDir = outputDir;
@@ -73,6 +77,7 @@ public class MisalignedReadsFilter extends BaseFilter {
         this.minGapDistance = minGapDistance;
         this.minOverlapPercentage = minOverlapPercentage;
 		this.maxNM = maxNM;
+		this.enableBlat = enableBlat;
     }        
     
     @Override
@@ -90,14 +95,17 @@ public class MisalignedReadsFilter extends BaseFilter {
             return sites;
         }
         try {
-            createFastaFile(sites);
-            int result = runBlat();
-            if (result != 0) {
-                System.out.println("blat process failed(exit code: " + result + ")");
-                return new ArrayList<Site>();
+            Map<String, AlignmentEntry> alignments = null;
+            if (enableBlat) {
+                createFastaFile(sites);
+                int result = runBlat();
+                if (result != 0) {
+                    System.out.println("blat process failed(exit code: " + result + ")");
+                    return new ArrayList<Site>();
+                }
+                alignments = parsePslFile();
             }
             
-            Map<String, AlignmentEntry> alignments = parsePslFile();
             List<Site> results = new ArrayList<Site>();
             
             for (Site entry : sites) {
@@ -118,10 +126,12 @@ public class MisalignedReadsFilter extends BaseFilter {
                     } else {
                         id += "/2";
                     }
-                    AlignmentEntry alignment = alignments.get(id);
+                    AlignmentEntry alignment = enableBlat ? alignments.get(id) : null;
                     AlignmentResult r = getAlignmentResult(
                             samRecord, entry.getRefName(), readPos, alignment);
-                    
+                    if (r.equals(AlignmentResult.ALIGNMENT_MISSING) && !enableBlat) {
+                        r = AlignmentResult.ALIGNMENT_OK;
+                    }
                     ac[r.ordinal()]++;
                     
                     alignmentResultCount[base == entry.getMajorAllele() ? 0 : 1][r.ordinal()]++;
