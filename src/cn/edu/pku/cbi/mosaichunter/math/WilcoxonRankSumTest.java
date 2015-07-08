@@ -37,7 +37,6 @@ public class WilcoxonRankSumTest {
             rank[i] /= cnt[i];
         }
         
-        // STATISTIC <- c("W" = sum(r[seq_along(x)]) - n.x * (n.x + 1) / 2)
         double stats = 0;
         int j = 0;
         for (int i = 0; i < nx; ++i) {
@@ -53,7 +52,8 @@ public class WilcoxonRankSumTest {
         for (int i = 0; i < n; ++i) {
             tmp += (double) cnt[i] * cnt[i] * cnt[i] - cnt[i];
         }
-        double sigma = Math.sqrt(((double) nx * ny / 12) * (nx + ny + 1 - tmp / (nx + ny) / (nx + ny - 1)));
+        double sigma = Math.sqrt(
+                ((double) nx * ny / 12) * (nx + ny + 1 - tmp / (nx + ny) / (nx + ny - 1)));
         if (z > EPS) {
             z -= 0.5;
         } else if (z < -EPS) {

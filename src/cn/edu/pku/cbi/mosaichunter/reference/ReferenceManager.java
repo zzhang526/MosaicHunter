@@ -29,7 +29,8 @@ public class ReferenceManager implements Serializable {
     private long lastPosition;
     private Sequence lastSequence;
     
-    public ReferenceManager(String referenceFastaFile, String[] validReferences) throws IOException {
+    public ReferenceManager(String referenceFastaFile, String[] validReferences) 
+            throws IOException {
         if (validReferences != null) {
             this.validReferences.addAll(Arrays.asList(validReferences));
         }
@@ -72,11 +73,11 @@ public class ReferenceManager implements Serializable {
                         sequenceStart = 0;
                     }
                     
-                    //System.out.println(referenceName + " " + validReferences.contains(referenceName) + " "+ validReferences.size());
                     if (validReferences.isEmpty() || validReferences.contains(referenceName)) {
                         referenceIds.put(referenceName, references.size());
                         Reference reference = new Reference(
-                                referenceName, referenceMetadata, referenceLength, referenceSequences);
+                                referenceName, referenceMetadata, 
+                                referenceLength, referenceSequences);
                         references.add(reference);
                         totalLength += reference.getLength();
                     }
@@ -118,7 +119,8 @@ public class ReferenceManager implements Serializable {
                                         sequenceLength,
                                         new long[(int)((sequenceLength >> 5) + 1)]);
                                 System.arraycopy(
-                                        buffer, 0, sequence.getBases(), 0, sequence.getBases().length);
+                                        buffer, 0, 
+                                        sequence.getBases(), 0, sequence.getBases().length);
                                 referenceSequences.add(sequence);
                                 sequenceStart = 0;
                             }

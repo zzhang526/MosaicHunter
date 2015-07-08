@@ -419,8 +419,6 @@ public class MosaicFilter extends BaseFilter {
         }
     }
 
-    public static long[] cnt = new long[255];
-
     @Override
     public boolean doFilter(Site site) {
 
@@ -449,22 +447,18 @@ public class MosaicFilter extends BaseFilter {
             control = controlSiteReader.read(site.getRefName(), site.getRefPos(), site.getRef(),
                     site.getAlleleCountOrder());
         } catch (Exception e) {
-            cnt[201]++;
             return false;
         }
         if (control.getDepth() == 0) {
-            cnt[207]++;
             return false;
         }
 
         double[] casePosterior = calcIndividualPosterior(site, false);
         double[] controlPosterior = calcIndividualPosterior(control, false);
         if (casePosterior == null) {
-            cnt[202]++;
             return false;
         }
         if (controlPosterior == null) {
-            cnt[203]++;
             return false;
         }
 
@@ -486,7 +480,6 @@ public class MosaicFilter extends BaseFilter {
             }
         }
         if (alleleCounts[0] + alleleCounts[1] + alleleCounts[2] + alleleCounts[3] > 2) {
-            cnt[204]++;
             return false;
         }
 
@@ -495,26 +488,19 @@ public class MosaicFilter extends BaseFilter {
 
         int a = site.getAlleleCount(majorAllele);
         int b = site.getAlleleCount(minorAllele);
-
-        /**************/
-        // System.out.println(majorId + " " + (char) getBase(majorId) + " " + control.getAlleleCount(majorAllele));
-        // System.out.println(minorId + " " + (char) getBase(minorId) + " " + control.getAlleleCount(minorAllele));
-        // System.out.println(control.getAlleleCount()+" "+control.getAlleleCount(1)+" "+control.getAlleleCount(2)+" "+control.getAlleleCountById(3));
-        // System.out.println(control.getAlleleCountOrder());
-        // System.out.println(site.getAlleleCount(0)+" "+site.getAlleleCount(1)+" "+
-        // site.getAlleleCount(2)+" "+site.getAlleleCount(3));
-        // System.out.println(site.getAlleleCountOrder());
-
         int c = control.getAlleleCount(majorAllele);
         int d = control.getAlleleCount(minorAllele);
 
         if (isPairedFisher()) {
             double p = FishersExactTest.twoSided(a, b, c, d);
             site.setMetadata(getName(), new Object[] {
-                    "Case(" + (char) getBase(majorId) + ":" + a + "," + (char) getBase(minorId) + ":" + b + ")",
-                    "Control(" + (char) getBase(majorId) + ":" + c + "," + (char) getBase(minorId) + ":" + d + ")", casePosterior[0],
-                    casePosterior[1], casePosterior[2], casePosterior[3], controlPosterior[0], controlPosterior[1], controlPosterior[2],
-                    controlPosterior[3], p });
+                    "Case(" + (char) getBase(majorId) + ":" + a + "," +
+                              (char) getBase(minorId) + ":" + b + ")",
+                    "Control(" + (char) getBase(majorId) + ":" + c + "," +
+                                 (char) getBase(minorId) + ":" + d + ")", 
+                    casePosterior[0], casePosterior[1], casePosterior[2], casePosterior[3],
+                    controlPosterior[0], controlPosterior[1], 
+                    controlPosterior[2], controlPosterior[3], p });
             return p < controlFisherThreshold;
         }
 
@@ -618,7 +604,6 @@ public class MosaicFilter extends BaseFilter {
         try {
             father = fatherSiteReader.read(child.getRefName(), child.getRefPos(), child.getRef(), child.getAlleleCountOrder());
         } catch (Exception e) {
-            cnt[101]++;
             return -1;
         }
 
@@ -628,30 +613,24 @@ public class MosaicFilter extends BaseFilter {
             mother = motherSiteReader.read(child.getRefName(), child.getRefPos(), child.getRef(), child.getAlleleCountOrder());
 
         } catch (Exception e) {
-            cnt[102]++;
             return -1;
         }
 
         if (father == null) {
-            cnt[103]++;
             return -1;
         }
         if (mother == null) {
-            cnt[104]++;
             return -1;
         }
 
         if (father.getDepth() == 0) {
-            cnt[108]++;
             return -1;
         }
         if (mother.getDepth() == 0) {
-            cnt[109]++;
             return -1;
         }
         double[] af = getAF(child);
         if (af == null) {
-            cnt[105]++;
             return -1;
         }
 
@@ -659,23 +638,15 @@ public class MosaicFilter extends BaseFilter {
         double[] motherPrior = calcPrior(af, af, mother, "F", mother.getMajorAlleleId(), mother.getMinorAlleleId());
 
         if (motherPrior == null) {
-            cnt[106]++;
             motherPrior = new double[] { 0, 0, 0, 0 };
         }
-        print10(fatherPrior, "father prior");
-        print10(motherPrior, "mother prior");
-
+        
         double[] fatherLikelihood = calcLikelihood(father, father.getMajorAlleleId(), father.getMinorAlleleId());
         double[] motherLikelihood = calcLikelihood(mother, mother.getMajorAlleleId(), mother.getMinorAlleleId());
         double[] childLikelihood = calcLikelihood(child, child.getMajorAlleleId(), child.getMinorAlleleId());
 
-        print10(fatherLikelihood, "father like");
-        print10(motherLikelihood, "mother like");
-        print10(childLikelihood, "child like");
-
         double[][][] cpd = calcCPD(father, mother, child);
         if (cpd == null) {
-            cnt[107]++;
             return -1;
         }
 
@@ -687,30 +658,22 @@ public class MosaicFilter extends BaseFilter {
         for (int i = 0; i < 4; ++i) {
             for (int j = 0; j < 4; ++j) {
                 for (int k = 0; k < 4; ++k) {
-                    joint[i][j][k] = fatherLikelihood[i] + motherLikelihood[j] + childLikelihood[k] + fatherPrior[i] + motherPrior[j]
+                    joint[i][j][k] = fatherLikelihood[i] + motherLikelihood[j] + 
+                            childLikelihood[k] + fatherPrior[i] + motherPrior[j]
                             + cpd[i][j][k];
                     fatherPosterior[i] = expAdd(fatherPosterior[i], joint[i][j][k]);
                     motherPosterior[j] = expAdd(motherPosterior[j], joint[i][j][k]);
                     childPosterior[k] = expAdd(childPosterior[k], joint[i][j][k]);
                     sum = expAdd(sum, joint[i][j][k]);
                 }
-                print10(joint[i][j], "joint " + i + " " + j);
             }
         }
-        print10(fatherPosterior, "father1");
-        print10(motherPosterior, "mother1");
-        print10(childPosterior, "child1");
-        // System.out.println(sum);
         for (int i = 0; i < 4; ++i) {
             fatherPosterior[i] -= sum;
             motherPosterior[i] -= sum;
             childPosterior[i] -= sum;
         }
-
-        print10(fatherPosterior, "father");
-        print10(motherPosterior, "mother");
-        print10(childPosterior, "child");
-
+       
         double mosaic = Math.pow(10, childPosterior[3]);
 
         child.setMetadata(
@@ -772,8 +735,6 @@ public class MosaicFilter extends BaseFilter {
                 if (cpd[i][j] == null) {
                     return null;
                 }
-                print10(cpd[i][j], "cpd " + i + " " + j);
-
             }
         }
         return cpd;
@@ -844,25 +805,6 @@ public class MosaicFilter extends BaseFilter {
                     posterior[0], posterior[1], posterior[2], posterior[3], Math.pow(10, posterior[3]) });
         }
         return posterior;
-    }
-
-    private void print(double[] d, String name) {
-        if (true)
-            return;
-        if (d != null)
-            System.out.println(name + "\t" + format.format(Math.pow(10, d[0])) + "\t" + format.format(Math.pow(10, d[1])) + "\t"
-                    + format.format(Math.pow(10, d[2])) + "\t" + format.format(Math.pow(10, d[3])) + "\t");
-
-    }
-
-    private void print10(double[] d, String name) {
-
-        if (true)
-            return;
-        if (d != null)
-            System.out.println(name + "\t" + format.format(d[0]) + "\t" + format.format(d[1]) + "\t" + format.format(d[2]) + "\t"
-                    + format.format(d[3]) + "\t");
-
     }
 
     private double[] calcPrior(double[] fatherAf, double[] motherAf, Site site, String sex, int majorAlleleId, int minorAlleleId) {
@@ -979,7 +921,6 @@ public class MosaicFilter extends BaseFilter {
 
     private double[] calcPosterior(int majorId, int minorId, double[] p, double[] prior) {
         if (prior == null) {
-            cnt[14]++;
             return null;
         }
 
@@ -1006,10 +947,8 @@ public class MosaicFilter extends BaseFilter {
             af = dbSnpReader.getAF(site.getRefName(), site.getRefPos());
         }
         if (af == null) {
-            cnt[4]++;
             int refId = getBaseId((char) site.getRef());
             if (refId < 0) {
-                cnt[5]++;
                 return null;
             }
             af = new double[] { novelAF, novelAF, novelAF, novelAF };

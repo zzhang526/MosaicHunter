@@ -59,7 +59,6 @@ public class Site {
         reads = new SAMRecord[maxDepth];
     }
     
-    // TODO base/baseQ
     public Site(String refName, int refId, long refPos, byte ref, int depth, int realDepth,
             byte[] bases, byte[] baseQualities, SAMRecord[] reads, short[] basePos) {
         this(refName, refId, refPos, ref, depth, realDepth, bases, baseQualities, reads, basePos, null);

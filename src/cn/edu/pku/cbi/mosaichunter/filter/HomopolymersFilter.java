@@ -55,9 +55,11 @@ public class HomopolymersFilter extends BaseFilter {
                     site.getRefName(), i);
             if (base == 'N' || base != lastBase || i == right + 1) {
                 if ((cnt >= longHomopolymerLength && 
-                     (i - cnt - longHomopolymerExpansion <= pos && i - 1 + longHomopolymerExpansion >= pos)) || 
+                     (i - cnt - longHomopolymerExpansion <= pos &&
+                      i - 1 + longHomopolymerExpansion >= pos)) || 
                     (cnt >= shortHomopolymerLength && 
-                     (i - cnt - shortHomopolymerExpansion <= pos && i - 1 + shortHomopolymerExpansion >= pos))) {
+                     (i - cnt - shortHomopolymerExpansion <= pos &&
+                      i - 1 + shortHomopolymerExpansion >= pos))) {
                     return false;
                 } 
                 cnt = 0;

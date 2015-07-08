@@ -53,8 +53,6 @@ public class MappingQualityFilter extends BaseFilter {
             minorQualities.append(i > 0 ? "," : "").append((int) minorAlleleQualities[i]);
         }
         
-        //WilcoxonSignedRankTest wsrt = new WilcoxonSignedRankTest();
-        
         double p = WilcoxonRankSumTest.twoSided(majorAlleleQualities, minorAlleleQualities);
         site.setMetadata(
                 getName(),

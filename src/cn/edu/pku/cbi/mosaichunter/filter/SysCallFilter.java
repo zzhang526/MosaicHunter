@@ -103,12 +103,10 @@ public class SysCallFilter extends BaseFilter {
         if (rawSite.getMajorAllele() == rawSite.getRef()) {
             refPosCount = rawSite.getPositiveMajorAlleleCount();
             refNegCount = rawSite.getNegativeMajorAlleleCount();
-            
         } else if (rawSite.getMinorAllele() == rawSite.getRef()) {
             refPosCount = rawSite.getPositiveMinorAlleleCount();
             refNegCount = rawSite.getNegativeMinorAlleleCount();
         } else {
-            // TODO?
             return false;
         }
         altPosCount = rawSite.getPositiveAlleleCount() - refPosCount;
@@ -155,23 +153,6 @@ public class SysCallFilter extends BaseFilter {
             int nextPos = tTestNegStrand ? pos - 1 : pos + 1;
             if (r.getReadNegativeStrandFlag() == tTestNegStrand &&
                 nextPos < r.getReadLength() && nextPos >= 0) {
-                /*
-                System.out.println();
-                System.out.println(r.getReadName());
-                
-
-                System.out.println(r.getReadString().substring(pos));
-                System.out.println(r.getBaseQualityString().substring(pos));
-                for (char c : r.getBaseQualityString().substring(pos).toCharArray()) {
-                    System.out.print(((byte) c - 33) + " ");
-                }
-                System.out.println();
-                System.out.println(r.getReadString());
-                System.out.println(r.getBaseQualityString());
-                
-                System.out.println((char)r.getReadBases()[pos] + " " + (char) r.getReadBases()[nextPos]);
-                System.out.println(r.getBaseQualities()[pos] + " " + r.getBaseQualities()[nextPos]);
-                */
                 double diff = r.getBaseQualities()[pos] - r.getBaseQualities()[nextPos];
                 diffSum += diff;
                 diff2Sum += diff * diff;

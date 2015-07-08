@@ -73,11 +73,6 @@ public class CompleteLinkageFilter extends BaseFilter {
                 if (m != null && m.getAlignmentStart() != reads[i].getAlignmentStart()) {
                     mates[i] = m;
                     StatsManager.count("mate_miss_true", 1);
-                    /*
-                    System.out.println(site.getRefName() + " " + site.getRefPos());
-                    System.out.println(reads[i].getMateAlignmentStart() + " " + reads[i].getAlignmentStart());
-                    System.out.println(mates[i].getMateAlignmentStart() + " " + mates[i].getAlignmentStart());
-                    */
                 }
                 int dis = Math.abs(reads[i].getMateAlignmentStart() - reads[i].getAlignmentStart());
                 if (dis > 0) {
@@ -159,12 +154,6 @@ public class CompleteLinkageFilter extends BaseFilter {
             int majorId = ids[0];
             int minorId = ids[1];
             
-            //if (entry.majorCount[majorId] + entry.minorCount[minorId] > 1 &&
-            //    entry.majorCount[minorId] + entry.minorCount[majorId] > 1) {
-            //    continue;
-            //}
-            
-            // TODO: binom.test, changed by Adam_Yyx, 2015-03-09
             int diagonalSum1 = entry.majorCount[majorId] + entry.minorCount[minorId];
             int diagonalSum2 = entry.majorCount[minorId] + entry.minorCount[majorId];
             int totalSum = diagonalSum1 + diagonalSum2;

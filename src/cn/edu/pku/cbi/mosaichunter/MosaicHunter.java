@@ -65,9 +65,6 @@ public class MosaicHunter {
         initLog();
         printHead(args);
 
-        // TODO validate parameters
-        
-        
         ConfigManager.getInstance().print();
         
         BamScanner scanner = new BamScanner();
@@ -229,23 +226,12 @@ public class MosaicHunter {
         System.out.println(message);
     }
     
-    private static void print(int indent, String message) {
-        for (int i = 0; i < indent; ++i) {
-            System.out.print(' ');
-        }
-        System.out.println(message);
-    }
-    
     private static void printf(Object message) {
         System.out.print(format(HELP_INDENT, HELP_WIDTH, message));
     }
     
     private static void printf(int indent, Object message) {
         System.out.print(format(indent, HELP_WIDTH, message));
-    }
-    
-    private static void printf(int indent, int width, String message) {
-        System.out.print(format(indent, width, message));
     }
     
     private static void printVersion() {

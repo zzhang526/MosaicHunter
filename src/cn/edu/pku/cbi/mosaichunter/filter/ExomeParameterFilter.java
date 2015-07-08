@@ -11,7 +11,6 @@ import java.util.List;
 import org.apache.commons.math3.stat.regression.SimpleRegression;
 
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
-import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
 import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
@@ -25,7 +24,6 @@ public class ExomeParameterFilter extends BaseFilter {
     private final int optimalDepth;
     private final String rDataFile;
     private FileWriter rDataWriter = null;
-
     
     private static final List<SimpleSite> sites = new ArrayList<SimpleSite>();
     
@@ -103,38 +101,6 @@ public class ExomeParameterFilter extends BaseFilter {
     
     @Override
     public void close() throws IOException {
-        String in = null;
-        
-        //in = "data/exome_parameter_filter.passed.tsv";
-        //in = "data/shu_family.64.s7.tsv";
-      
-        if (in != null) {
-            sites.clear();
-            List<String[]> f = null;
-            try {
-                f = MosaicHunterHelper.readTsvFile(in);
-            } catch (IOException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
-            for (int i = 0; i < f.size(); ++i) {
-                String[] ff = f.get(i);   
-                if (ff.length >= 11) {
-                    int ref = Integer.parseInt(ff[7]);
-                    int alt = Integer.parseInt(ff[9]);
-                    sites.add(new SimpleSite(ref + alt, Double.parseDouble(ff[ff.length - 1])));
-                } else {
-                    double p = Double.parseDouble(ff[7]);
-                    if (Math.pow(10, -p) < 0.9) {
-                        continue;
-                    }
-                    int ref = Integer.parseInt(ff[4]);
-                    int alt = Integer.parseInt(ff[5]);
-                    sites.add(new SimpleSite(ref + alt, (double) alt / (ref + alt)));
-                }
-            }
-        }
-        
         Collections.sort(sites, new Comparator<SimpleSite>() {
             public int compare(SimpleSite a, SimpleSite b) {
                 if (a.depth > b.depth) {
@@ -202,22 +168,12 @@ public class ExomeParameterFilter extends BaseFilter {
             sr.addData(depthMidR[i], afSd2[i]);
         }
 
-        
         double k = sr.getSlope();
         double d = sr.getIntercept();
-        
-        
-        //System.out.println("mean: " + afMeanAll);
-        //System.out.println("slop: " + k);
-        //System.out.println("intercept: " + d);
-  
         
         double v = k / optimalDepth + d - afMeanAll * (1 - afMeanAll) / optimalDepth;
         double alpha = ((1 - afMeanAll) / v - 1 / afMeanAll) * afMeanAll * afMeanAll;
         double beta =  alpha * (1 / afMeanAll - 1);
-        
-        //System.out.println("alpha: " + alpha);
-        //System.out.println("beta: " + beta);
         
         long averageDepth = n == 0 ? 0 : totalDepth / n;
         System.out.println("average depth: " + averageDepth);

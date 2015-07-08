@@ -6,8 +6,8 @@ import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 public class BaseNumberFilter extends BaseFilter {
 
     public static final int DEFAULT_MIN_MINOR_ALLELE_NUMBER = 5;
-    public static final int DEFAULT_MIN_MINOR_ALLELE_PERCENTAGE = 5;
-    public static final int DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE = 100;
+    public static final double DEFAULT_MIN_MINOR_ALLELE_PERCENTAGE = 5;
+    public static final double DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE = 100;
     
     private final int minMinorAlleleNumber;
     private final double minMinorAllelePercentage;
@@ -17,14 +17,14 @@ public class BaseNumberFilter extends BaseFilter {
         this(name,
              ConfigManager.getInstance().getInt(
                      name, "min_minor_allele_number", DEFAULT_MIN_MINOR_ALLELE_NUMBER),
-             ConfigManager.getInstance().getInt(
+             ConfigManager.getInstance().getDouble(
                      name, "min_minor_allele_percentage", DEFAULT_MIN_MINOR_ALLELE_PERCENTAGE),
-             ConfigManager.getInstance().getInt(
+             ConfigManager.getInstance().getDouble(
                      name, "max_minor_allele_percentage", DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE));
     }
     
     public BaseNumberFilter(String name, int minMinorAlleleNumber, 
-            int minMinorAllelePercentage, int maxMinorAllelePercentage) {
+            double minMinorAllelePercentage, double maxMinorAllelePercentage) {
         super(name);
         this.minMinorAlleleNumber = minMinorAlleleNumber;
         this.minMinorAllelePercentage = minMinorAllelePercentage / 100.0;

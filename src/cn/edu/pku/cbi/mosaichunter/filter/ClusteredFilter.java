@@ -54,7 +54,7 @@ public class ClusteredFilter extends BaseFilter {
         if (n < 3) {
             List<Site> passed = new ArrayList<Site>();
             for (Site site : sites) {
-                // TODO !!!
+                // TODO configurable
                 if (!site.getPassedFilters().contains("mosaic_like_filter")) {
                     passed.add(site);
                 }
