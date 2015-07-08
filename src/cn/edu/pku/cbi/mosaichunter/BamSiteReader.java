@@ -19,6 +19,7 @@ public class BamSiteReader {
     private final int maxDepth;
     private final int minReadQuality;
     private final int minMappingQuality;
+    private final boolean removeDuplicates;
     private final long seed;
     private final boolean depthSampling;
     private final Random random;
@@ -26,13 +27,14 @@ public class BamSiteReader {
     private SAMFileReader input;
     
     public BamSiteReader(ReferenceManager referenceManager, String inputFile, String indexFile, 
-            int maxDepth, int minReadQuality, int minMappingQuality) {
+            int maxDepth, int minReadQuality, int minMappingQuality, boolean removeDuplicates) {
         this.referenceManager = referenceManager;
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.maxDepth = maxDepth;
         this.minReadQuality = minReadQuality;
         this.minMappingQuality = minMappingQuality;
+        this.removeDuplicates = removeDuplicates;
         this.seed = ConfigManager.getInstance().getLong(null, "seed", System.currentTimeMillis());
         this.depthSampling = ConfigManager.getInstance().getBoolean(null, "depth_sampling", false);
         this.random = new Random(seed);
@@ -71,7 +73,7 @@ public class BamSiteReader {
         byte[] baseQualities = new byte[maxDepth + 1];
         while (it.hasNext()) {
             SAMRecord read = it.next(); 
-            if (read.getDuplicateReadFlag()) {
+            if (read.getDuplicateReadFlag() && removeDuplicates) {
                 continue;
             }
             if (read.getMappingQuality() < minMappingQuality) {

@@ -21,7 +21,8 @@ import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 
 public class MisalignedReadsFilter extends BaseFilter {
     
-    public static final String DEFAULT_BLAT_PARAM = "-stepSize=5 -repMatch=2253 -minScore=0 -minIdentity=0.5 -noHead";
+    public static final String DEFAULT_BLAT_PARAM 
+            = "-stepSize=5 -repMatch=2253 -minScore=0 -minIdentity=0.5 -noHead";
     public static final double DEFAULT_MAX_MISALIGNMENT_PERCENTAGE = 0.5;
     public static final int DEFAULT_MIN_SIDE_DISTANCE = 15;
     public static final int DEFAULT_MIN_GAP_DISTANCE = 5;
@@ -29,6 +30,7 @@ public class MisalignedReadsFilter extends BaseFilter {
     public static final int DEFAULT_MAX_NM = 2;
     public static final boolean DEFAULT_ENABLE_BLAT = true;
         
+    private final String blatPath;
     private final String blatParam;
     private final String outputDir;
     private final String tmpInputFaFile;
@@ -43,6 +45,7 @@ public class MisalignedReadsFilter extends BaseFilter {
 
     public MisalignedReadsFilter(String name) {
         this(name,
+             ConfigManager.getInstance().get(name, "blat_path", null),
              ConfigManager.getInstance().get(name, "blat_param", DEFAULT_BLAT_PARAM),
              ConfigManager.getInstance().get(null, "output_dir", "."),
              ConfigManager.getInstance().get(name, "reference_file", "").isEmpty() ?
@@ -63,10 +66,11 @@ public class MisalignedReadsFilter extends BaseFilter {
     }
     
     public MisalignedReadsFilter(String name, 
-            String blatParam, String outputDir, String referenceFile,
+            String blatPath, String blatParam, String outputDir, String referenceFile,
             double maxMisalignmentPercentage, int minSideDistance, int minGapDistance, 
             double minOverlapPercentage, int maxNM, boolean enableBlat) {
         super(name);
+        this.blatPath = blatPath;
         this.blatParam = blatParam;        
         this.outputDir = outputDir;
         this.tmpInputFaFile = new File(outputDir, name + ".fa").getPath();
@@ -84,9 +88,6 @@ public class MisalignedReadsFilter extends BaseFilter {
     public boolean doFilter(Site site) {
         return !doFilter(Collections.singletonList(site)).isEmpty();
     }
-    
-    //TODO
-    public static int[] ac = new int[AlignmentResult.values().length];
     
     @Override
     public List<Site> doFilter(List<Site> sites) {
@@ -132,7 +133,6 @@ public class MisalignedReadsFilter extends BaseFilter {
                     if (r.equals(AlignmentResult.ALIGNMENT_MISSING) && !enableBlat) {
                         r = AlignmentResult.ALIGNMENT_OK;
                     }
-                    ac[r.ordinal()]++;
                     
                     alignmentResultCount[base == entry.getMajorAllele() ? 0 : 1][r.ordinal()]++;
                     if (r != AlignmentResult.ALIGNMENT_OK) {
@@ -274,9 +274,25 @@ public class MisalignedReadsFilter extends BaseFilter {
         writer.close();
     }
     
+    private String getBlatCmd() {
+        String cmd = "blat";
+        if (blatPath == null || blatPath.trim().isEmpty()) {
+            return cmd;
+        }
+        File pathFile = new File(blatPath);
+        if (pathFile.isDirectory()) {
+            return new File(blatPath, "blat").getAbsolutePath();
+        } else if (pathFile.isFile()) {
+            return pathFile.getAbsolutePath();
+        } else {
+            return "blat";
+        }
+    }
+    
     private int runBlat() throws IOException, InterruptedException {
-        // TODO configurable blat path
-        String cmd = "blat " + blatParam + " " + referenceFile + " " + tmpInputFaFile + " " + tmpOutputPslFile;
+        String blatCmd = getBlatCmd();
+        String cmd = blatCmd + " " + blatParam + " " + 
+                referenceFile + " " + tmpInputFaFile + " " + tmpOutputPslFile;
         System.out.println("run blat: " + cmd);
         Runtime rt = Runtime.getRuntime();
         Process blat = rt.exec(cmd);
@@ -294,16 +310,6 @@ public class MisalignedReadsFilter extends BaseFilter {
                      break;
                  }
                  String[] tokens = line.split("\\t");
-                 
-                 // match   mis-    rep.    N's     Q gap   Q gap   T gap   T gap   strand  Q       Q       Q       Q       T       T       T       T       block   blockSizes      qStarts  tStarts
-                 //         match   match   count   bases   count   bases                   name    size    start   end     name    size    start   end     count
-                 // 18      0       0       0       0       0       0       0       +       FCD1PAFACXX:5:2303:12251:85398  100     11      29      X       155270560       138075570       138075588       1       18,     11,     138075570,
-                 
-                //  100     0       0       0       0       0       1       59      +       FCC0AYWACXX:6:2103:4232:169015#GCCAATAT 100     0       100     chr3    198022430       195438416       195438575       2       5,95,   0,5,    195438416,195438480,
-                 //99      0       0       0       0       0       0       0       +       FCC0B03ACXX:7:1105:21126:69210#CGATGTAT 100     1       100     chr6    171115067       322612  322711  1
-                 // 99,     1,      322612,
-                 //102398378
-                 //97  3   0   0   0   0   1   2   +   FCC0AYWACXX:6:1305:13914:106725#GCCAATAT    100 0   100 chr14   107349540   102398301   102398403   2   76,24,  0,76,   102398301,102398379,
                  
                  AlignmentEntry entry = new AlignmentEntry();
                  String id = tokens[9];

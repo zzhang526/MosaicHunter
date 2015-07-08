@@ -24,7 +24,7 @@ public class MosaicFilter extends BaseFilter {
 
     public static final String DEFAULT_SEX = "M";
     public static final double DEFAULT_MOSAIC_THRESHOLD = 0.05;
-    public static final double DEFAULT_CONTROL_FISHER_THRESHOLD = 0.01;
+    public static final double DEFAULT_FISHER_THRESHOLD = 0.01;
 
     public static final int MAX_QUALITY = 64;
     public static final int MAX_QUALITY_DEPTH = 70;
@@ -46,6 +46,7 @@ public class MosaicFilter extends BaseFilter {
     private final int betaParam;
     private final int minReadQuality;
     private final int minMappingQuality;
+    private final boolean removeDuplicates;
     private final String mode;
     private final String sex;
     private final double[] baseChangeRate;
@@ -79,25 +80,35 @@ public class MosaicFilter extends BaseFilter {
     private final double[][] defaultAF = new double[4][4];
 
     public MosaicFilter(String name) {
-        this(name, ConfigManager.getInstance().getInt(null, "max_depth", DEFAULT_MAX_DEPTH), ConfigManager.getInstance().getInt(null,
-                "min_read_quality", DEFAULT_MIN_READ_QUALITY), ConfigManager.getInstance().getInt(null, "min_mapping_quality",
-                DEFAULT_MIN_MAPPING_QUALITY), ConfigManager.getInstance().get(name, "mode"), ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), ConfigManager
-                .getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), ConfigManager.getInstance().get(name, "sex", DEFAULT_SEX),
-                ConfigManager.getInstance().getDoubles(name, "base_change_rate", DEFAULT_BASE_CHANGE_RATE), ConfigManager.getInstance()
-                        .getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD), ConfigManager.getInstance()
-                        .get(name, "father_bam_file", null), ConfigManager.getInstance().get(name, "father_index_file", null),
-                ConfigManager.getInstance().get(name, "mother_bam_file", null), ConfigManager.getInstance().get(name, "mother_index_file",
-                        null), ConfigManager.getInstance().get(name,
-                        "control_bam_file", null), ConfigManager.getInstance().get(name, "control_index_file", null), ConfigManager.getInstance().getDouble(name, "control_fisher_threshold",
-                        DEFAULT_CONTROL_FISHER_THRESHOLD), ConfigManager.getInstance()
-                        .getDouble(name, "de_novo_rate", DEFAULT_DE_NOVO_RATE), ConfigManager.getInstance().getDouble(name, "mosaic_rate",
-                        DEFAULT_MOSAIC_RATE), ConfigManager.getInstance().getDouble(name, "unknown_af", DEFAULT_UNKNOWN_AF), ConfigManager
-                        .getInstance().getDouble(name, "novel_af", DEFAULT_NOVEL_AF));
+        this(name, 
+            ConfigManager.getInstance().getInt(null, "max_depth", DEFAULT_MAX_DEPTH), 
+            ConfigManager.getInstance().getInt(null, "min_read_quality", DEFAULT_MIN_READ_QUALITY), 
+            ConfigManager.getInstance().getInt(null, "min_mapping_quality", DEFAULT_MIN_MAPPING_QUALITY), 
+            ConfigManager.getInstance().getBoolean(null, "removeDuplicates", true), 
+            ConfigManager.getInstance().get(name, "mode"), 
+            ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), 
+            ConfigManager.getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), 
+            ConfigManager.getInstance().get(name, "sex", DEFAULT_SEX),
+            ConfigManager.getInstance().getDoubles(name, "base_change_rate", DEFAULT_BASE_CHANGE_RATE), 
+            ConfigManager.getInstance().getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD),
+            ConfigManager.getInstance().get(name, "father_bam_file", null), 
+            ConfigManager.getInstance().get(name, "father_index_file", null),
+            ConfigManager.getInstance().get(name, "mother_bam_file", null), 
+            ConfigManager.getInstance().get(name, "mother_index_file", null), 
+            ConfigManager.getInstance().get(name, "control_bam_file", null), 
+            ConfigManager.getInstance().get(name, "control_index_file", null), 
+            ConfigManager.getInstance().getDouble(name, "fisher_threshold", DEFAULT_FISHER_THRESHOLD), 
+            ConfigManager.getInstance().getDouble(name, "de_novo_rate", DEFAULT_DE_NOVO_RATE), 
+            ConfigManager.getInstance().getDouble(name, "mosaic_rate", DEFAULT_MOSAIC_RATE), 
+            ConfigManager.getInstance().getDouble(name, "unknown_af", DEFAULT_UNKNOWN_AF), 
+            ConfigManager.getInstance().getDouble(name, "novel_af", DEFAULT_NOVEL_AF));
     }
 
-    public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, String mode, int alphaParam, int betaParam, String sex,
-            double[] baseChangeRate, double mosaicThreshold, String fatherBamFile,
-            String fatherIndexFile, String motherBamFile, String motherIndexFile, String controlBamFile,
+    public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, 
+            boolean removeDuplicates, String mode, int alphaParam, int betaParam, String sex,
+            double[] baseChangeRate, double mosaicThreshold, 
+            String fatherBamFile, String fatherIndexFile, 
+            String motherBamFile, String motherIndexFile, String controlBamFile,
             String controlIndexFile, double controlFisherThreshold,
             double deNovoRate, double mosaicRate, double unknownAF, double novelAF) {
         super(name);
@@ -106,6 +117,7 @@ public class MosaicFilter extends BaseFilter {
         this.betaParam = betaParam;
         this.minReadQuality = minReadQuality;
         this.minMappingQuality = minMappingQuality;
+        this.removeDuplicates = removeDuplicates;
         this.mode = mode == null ? "single" : mode.trim();
         this.sex = sex;
         this.baseChangeRate = baseChangeRate;
@@ -267,7 +279,8 @@ public class MosaicFilter extends BaseFilter {
                 throw new Exception(getName() + ".control_bam_file property is missing");
             }
             controlSiteReader = new BamSiteReader(
-                getContext().getReferenceManager(), controlBamFile, controlIndexFile, maxDepth, minReadQuality, minMappingQuality);
+                getContext().getReferenceManager(), controlBamFile, controlIndexFile, 
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
             controlSiteReader.init();
         } else if (isTrio()) {
             if (fatherBamFile == null) {
@@ -278,11 +291,13 @@ public class MosaicFilter extends BaseFilter {
             }
 
             fatherSiteReader = new BamSiteReader(
-                getContext().getReferenceManager(), fatherBamFile, fatherIndexFile, maxDepth, minReadQuality, minMappingQuality);
+                getContext().getReferenceManager(), fatherBamFile, fatherIndexFile, 
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
             fatherSiteReader.init();
 
             motherSiteReader = new BamSiteReader(
-                getContext().getReferenceManager(), motherBamFile, motherIndexFile, maxDepth, minReadQuality, minMappingQuality);
+                getContext().getReferenceManager(), motherBamFile, motherIndexFile, 
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
             motherSiteReader.init();
         }
     }

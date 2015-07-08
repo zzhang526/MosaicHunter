@@ -41,6 +41,7 @@ public class BamScanner {
     private final String referenceFile;    
     private final int maxDepth;
     private final int maxSites;
+    private final boolean removeDuplicates;
     private final Filter inProcessFilter;
     private final Filter postProcessfilter;  
     private final long seed;
@@ -57,6 +58,7 @@ public class BamScanner {
                      null, "post_process_filter_name", null)),
              ConfigManager.getInstance().getInt(null, "max_depth"),
              ConfigManager.getInstance().getInt(null, "max_sites", 500000),
+             ConfigManager.getInstance().getBoolean(null, "remove_duplicates", true),
              ConfigManager.getInstance().getLong(null, "seed", System.currentTimeMillis()),
              ConfigManager.getInstance().getBoolean(null, "depth_sampling", false)
              );        
@@ -64,7 +66,8 @@ public class BamScanner {
     
     public BamScanner(String inputFile, String indexFile, String referenceFile, 
             Filter inProcessFilter, Filter postProcessfilter, int maxDepth, 
-            int maxSites, long seed, boolean depthSampling) throws Exception {
+            int maxSites, boolean removeDuplicates, long seed, boolean depthSampling) 
+                    throws Exception {
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.referenceFile = referenceFile;
@@ -72,11 +75,10 @@ public class BamScanner {
         this.postProcessfilter = postProcessfilter;
         this.maxDepth = maxDepth;
         this.maxSites = maxSites;
+        this.removeDuplicates = removeDuplicates;
         this.seed = seed;
         this.depthSampling = depthSampling;
         this.random = new Random(this.seed);
-        
-       
     }
     
     public void scan() throws Exception  {       
@@ -117,12 +119,10 @@ public class BamScanner {
         input.setValidationStringency(ValidationStringency.SILENT);
         
         boolean ok = true;
-        int matchedReferences = 0;
         for (SAMSequenceRecord seq : input.getFileHeader().getSequenceDictionary().getSequences()) {
             int sid = referenceManager.getReferenceId(seq.getSequenceName());
             if (sid >= 0) {
                 if (seq.getSequenceLength() == referenceManager.getReferenceLength(sid)) {
-                    matchedReferences++;
                 } else {
                     System.out.println("inconsistent reference length: " + seq.getSequenceName());
                     ok = false;
@@ -135,10 +135,6 @@ public class BamScanner {
             samFileReader.close();
             return;
         }
-        //System.out.println("matched reference number: " + matchedReferences);
-        
-        // TODO remove
-        long[] cnt = new long[100];
         
         long processedReads = 0;
         long processedSites = 0;
@@ -270,8 +266,7 @@ public class BamScanner {
                         continue;
                     }
                     
-                    // TODO add parameter?
-                    if (read.getDuplicateReadFlag()) {
+                    if (read.getDuplicateReadFlag() && removeDuplicates) {
                         continue;
                     }
                     if (read.getMappingQuality() < minMappingQuality) {
@@ -357,10 +352,6 @@ public class BamScanner {
                     }
                     depthSum += site.getDepth();
                     depthCount++;
-                    
-                    cnt[0] ++;
-                    cnt[1] += site.getDepth();
-                   
                     
                     sites.remove(positionId);
                     itor.remove();
@@ -460,7 +451,7 @@ public class BamScanner {
             }
             
             if (referenceManager == null) {
-                System.out.println(new Date() + " Reading reference from file: " + referenceFile);
+                System.out.println(new Date() + " Reading reference: " + referenceFile);
                 referenceManager = new ReferenceManager(referenceFile, validReferences);
                 System.out.println(new Date() + " Writing reference to cache file: " + 
                         cacheFile.getAbsolutePath());

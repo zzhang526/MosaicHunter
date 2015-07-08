@@ -59,7 +59,7 @@ public class Parameters {
             "The .bed file of commons sites.");
     
     public static final Parameter OUTPUT_DIR = new Parameter(
-            null, "output_dir", false, "tmp", 
-            "Where the output and log files go.");
+            null, "output_dir", false, "output", 
+            "Where the output files go.");
     
 }

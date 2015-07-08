@@ -66,8 +66,11 @@ public class SysCallFilter extends BaseFilter {
         String inputFile = ConfigManager.getInstance().get(null, "input_file", null);
         String indexFile = ConfigManager.getInstance().get(null, "index_file", null);
         int maxDepth = ConfigManager.getInstance().getInt(null, "max_depth");
+        boolean removeDuplicates = ConfigManager.getInstance().getBoolean(
+                null, "remove_duplicates", true);
         siteReader = new BamSiteReader(
-                getContext().getReferenceManager(), inputFile, indexFile, maxDepth, 0, 0);
+                getContext().getReferenceManager(), inputFile, indexFile, 
+                maxDepth, 0, 0, removeDuplicates);
         siteReader.init();
     }
     
