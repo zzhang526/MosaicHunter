@@ -13,17 +13,21 @@ public class ClusteredFilter extends BaseFilter {
         
     private final long innerDistance;
     private final long outerDistance;
+    private final String auxiliaryFilterName;
     
     public ClusteredFilter(String name) {
         this(name,
              ConfigManager.getInstance().getLong(name, "inner_distance", DEFAULT_INNER_DISTANCE),
-             ConfigManager.getInstance().getLong(name, "outer_distance", DEFAULT_OUTER_DISTANCE));
+             ConfigManager.getInstance().getLong(name, "outer_distance", DEFAULT_OUTER_DISTANCE),
+             ConfigManager.getInstance().get(name, "auxiliary_filter_name", null));
     }
     
-    public ClusteredFilter(String name, long innerDistance, long outerDistance) {
+    public ClusteredFilter(
+            String name, long innerDistance, long outerDistance, String auxiliaryFilterName) {
         super(name);
         this.innerDistance = innerDistance;
         this.outerDistance = outerDistance;
+        this.auxiliaryFilterName = auxiliaryFilterName;
     }
     
     @Override
@@ -54,8 +58,8 @@ public class ClusteredFilter extends BaseFilter {
         if (n < 3) {
             List<Site> passed = new ArrayList<Site>();
             for (Site site : sites) {
-                // TODO configurable
-                if (!site.getPassedFilters().contains("mosaic_like_filter")) {
+                if (auxiliaryFilterName == null ||
+                    !site.getPassedFilters().contains(auxiliaryFilterName)) {
                     passed.add(site);
                 }
             }
@@ -124,7 +128,9 @@ public class ClusteredFilter extends BaseFilter {
                     new Object[] {
                         posBefore,
                         posAfter});
-            if (!filterFlag[i] && !site.getPassedFilters().contains("mosaic_like_filter")) {
+            if (!filterFlag[i] && 
+                (auxiliaryFilterName == null || 
+                !site.getPassedFilters().contains(auxiliaryFilterName))) {
                 passed.add(site);
             } 
         }

@@ -11,15 +11,19 @@ public class NearMosaicFilter extends BaseFilter {
     public static final long DEFAULT_DISTANCE = 10000;
         
     private final long distance;
+    private final String auxiliaryFilterName;
+
     
     public NearMosaicFilter(String name) {
         this(name,
-             ConfigManager.getInstance().getLong(name, "distance", DEFAULT_DISTANCE));
+             ConfigManager.getInstance().getLong(name, "distance", DEFAULT_DISTANCE),
+             ConfigManager.getInstance().get(name, "auxiliary_filter_name", null));
     }
     
-    public NearMosaicFilter(String name, long distance) {
+    public NearMosaicFilter(String name, long distance, String auxiliaryFilterName) {
         super(name);
         this.distance = distance;
+        this.auxiliaryFilterName = auxiliaryFilterName;
     }
     
     @Override
@@ -41,8 +45,8 @@ public class NearMosaicFilter extends BaseFilter {
                 lastMosaicPos = -1;
                 lastChrName = chrName;
             }      
-           
-            if (!site.getPassedFilters().contains("mosaic_like_filter")) {
+            if (auxiliaryFilterName == null || 
+                !site.getPassedFilters().contains(auxiliaryFilterName)) {
                 // add sites before current mosaic site
                 for (Site pendingSite : pendingSites) {
                     if (site.getRefPos() - pendingSite.getRefPos() <= distance) {
