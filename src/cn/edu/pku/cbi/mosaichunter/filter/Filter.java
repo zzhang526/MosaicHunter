@@ -9,6 +9,8 @@ public interface Filter {
 
     String getName();
     
+    boolean validate();
+    
     void init(MosaicHunterContext context) throws Exception;
     
     boolean filter(Site site);

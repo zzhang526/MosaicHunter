@@ -18,6 +18,7 @@ import net.sf.samtools.AlignmentBlock;
 import net.sf.samtools.SAMRecord;
 import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
+import cn.edu.pku.cbi.mosaichunter.config.Validator;
 
 public class MisalignedReadsFilter extends BaseFilter {
     
@@ -84,6 +85,21 @@ public class MisalignedReadsFilter extends BaseFilter {
 		this.enableBlat = enableBlat;
     }        
     
+    
+    @Override
+    public boolean validate() {
+        boolean ok = true;
+        if (enableBlat) {
+            if (!Validator.validateExists(getName() + ".blat_path", blatPath, false)) {
+                ok = false;     
+            } else if (!Validator.validateCommandExists("blat", getBlatCmd())) {
+                ok = false; 
+            }
+        }
+        return ok;
+        
+    }
+
     @Override
     public boolean doFilter(Site site) {
         return !doFilter(Collections.singletonList(site)).isEmpty();
@@ -275,9 +291,8 @@ public class MisalignedReadsFilter extends BaseFilter {
     }
     
     private String getBlatCmd() {
-        String cmd = "blat";
         if (blatPath == null || blatPath.trim().isEmpty()) {
-            return cmd;
+            return "blat";
         }
         File pathFile = new File(blatPath);
         if (pathFile.isDirectory()) {
@@ -285,7 +300,7 @@ public class MisalignedReadsFilter extends BaseFilter {
         } else if (pathFile.isFile()) {
             return pathFile.getAbsolutePath();
         } else {
-            return "blat";
+            return null;
         }
     }
     

@@ -14,6 +14,7 @@ import java.util.PriorityQueue;
 import java.util.Random;
 
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
+import cn.edu.pku.cbi.mosaichunter.config.Validator;
 import cn.edu.pku.cbi.mosaichunter.filter.Filter;
 import cn.edu.pku.cbi.mosaichunter.filter.FilterFactory;
 import cn.edu.pku.cbi.mosaichunter.reference.Reference;
@@ -27,10 +28,7 @@ import net.sf.samtools.SAMSequenceRecord;
 
 
 public class BamScanner {
-    
-    
-    //public static final String DEFAULT_REFERENCE_PREFIX = "";
-    
+        
     public static final String[] DEFAULT_VALID_REFERENCES = new String[] {
             "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", 
             "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y"  
@@ -43,7 +41,7 @@ public class BamScanner {
     private final int maxSites;
     private final boolean removeDuplicates;
     private final Filter inProcessFilter;
-    private final Filter postProcessfilter;  
+    private final Filter postProcessFilter;  
     private final long seed;
     private final boolean depthSampling;
     private final Random random;
@@ -65,14 +63,14 @@ public class BamScanner {
     }
     
     public BamScanner(String inputFile, String indexFile, String referenceFile, 
-            Filter inProcessFilter, Filter postProcessfilter, int maxDepth, 
+            Filter inProcessFilter, Filter postProcessFilter, int maxDepth, 
             int maxSites, boolean removeDuplicates, long seed, boolean depthSampling) 
                     throws Exception {
         this.inputFile = inputFile;
         this.indexFile = indexFile;
         this.referenceFile = referenceFile;
         this.inProcessFilter = inProcessFilter;
-        this.postProcessfilter = postProcessfilter;
+        this.postProcessFilter = postProcessFilter;
         this.maxDepth = maxDepth;
         this.maxSites = maxSites;
         this.removeDuplicates = removeDuplicates;
@@ -81,9 +79,29 @@ public class BamScanner {
         this.random = new Random(this.seed);
     }
     
+    private boolean validate() {
+        boolean ok = true;
+        if (!Validator.validateFileExists("reference_file", referenceFile, true)) {
+            ok = false;
+        }
+        if (!Validator.validateFileExists("input_file", inputFile, true)) {
+            ok = false;
+        }
+        if (!Validator.validateFileExists("index_file", indexFile, false)) {
+            ok = false;
+        }
+        return ok;
+    }
+    
     public void scan() throws Exception  {       
         System.out.println(new Date() + " Initializing...");
         
+        boolean good = validate();
+        good &= inProcessFilter.validate();
+        good &= postProcessFilter.validate();
+        if (!good) {
+            return;
+        }
         ConfigManager config = ConfigManager.getInstance();
         
         // site object facetory
@@ -108,9 +126,11 @@ public class BamScanner {
         MosaicHunterContext context = 
                 new MosaicHunterContext(samFileReader, referenceManager, readsCache);
         
+       
+        
         System.out.println(new Date() + " Initializing filters...");
         inProcessFilter.init(context);
-        postProcessfilter.init(context);
+        postProcessFilter.init(context);
         
         // scan
         SAMFileReader input = new SAMFileReader(
@@ -282,7 +302,6 @@ public class BamScanner {
                     lastRefName = read.getReferenceName();
                     lastRefPos = read.getAlignmentStart();
                     byte[] bases = read.getReadBases();
-                    //byte[] baseQs = read.getBaseQualities();
                     for (AlignmentBlock block : read.getAlignmentBlocks()) {
                         int refPos = block.getReferenceStart();
                         for (int i = 0; i < block.getLength(); ++i, ++refPos) {
@@ -338,12 +357,11 @@ public class BamScanner {
                 
                 for (Iterator<Long> itor = siteIds.iterator(); itor.hasNext();) {
                     long positionId = itor.next();
-                    //int refId = getRefId(positionId);
-                    //int refPos = getRefPos(positionId);
                     Site site = sites.get(positionId);
                     if (site == null) {
                         System.out.println("ERROR!!! null site. " + 
-                                referenceManager.getReference(getRefId(positionId)).getName() + ":" + getRefPos(positionId));
+                                referenceManager.getReference(
+                                    getRefId(positionId)).getName() + ":" + getRefPos(positionId));
                         itor.remove();
                         continue;
                     }
@@ -385,16 +403,16 @@ public class BamScanner {
         StatsManager.end("in_process");
         
         StatsManager.start("post_process");
-        postProcessfilter.filter(passedSites);
+        postProcessFilter.filter(passedSites);
         StatsManager.end("post_process");
          
         inProcessFilter.printStats(true);
-        postProcessfilter.printStats(false);
+        postProcessFilter.printStats(false);
         
         input.close();
         samFileReader.close();
         inProcessFilter.close();
-        postProcessfilter.close();
+        postProcessFilter.close();
         
     }
     
@@ -415,8 +433,6 @@ public class BamScanner {
     
     private ReferenceManager createReferenceManager() throws Exception {
         
-        //String referencePrefix = ConfigManager.getInstance().get(
-        //        null, "reference_prefix", DEFAULT_REFERENCE_PREFIX);
         String[] validReferences = ConfigManager.getInstance().getValues(
                 null, "valid_references", DEFAULT_VALID_REFERENCES);
     

@@ -11,6 +11,7 @@ import java.util.Map;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
 import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
+import cn.edu.pku.cbi.mosaichunter.config.Validator;
 
 public class RegionFilter extends BaseFilter {
 
@@ -36,6 +37,16 @@ public class RegionFilter extends BaseFilter {
         this.expansion = expansion;
         this.include = include;
         
+    }
+    
+    @Override
+    public boolean validate() {
+        boolean ok = true;
+        if (!Validator.validateFileExists(
+                getName() + ".bed_file", bedFile, false)) {
+            ok = false;     
+        }
+        return ok;
     }
     
     
@@ -79,7 +90,7 @@ public class RegionFilter extends BaseFilter {
             if (reader != null) {
                 reader.close();
             }
-        }        
+        }    
     }
     
     @Override

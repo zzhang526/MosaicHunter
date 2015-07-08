@@ -23,6 +23,15 @@ public class OrFilter extends BaseFilter {
     }
     
     @Override
+    public boolean validate() {
+        boolean ok = super.validate();
+        for (Filter filter : filters) {
+            ok &= filter.validate();
+        }
+        return ok;
+    }
+    
+    @Override
     public void init(MosaicHunterContext context) throws Exception {
         super.init(context);
         for (Filter filter : filters) {

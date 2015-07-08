@@ -9,13 +9,13 @@ import cn.edu.pku.cbi.mosaichunter.MosaicHunterContext;
 import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
 import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
+import cn.edu.pku.cbi.mosaichunter.config.Validator;
 import cn.edu.pku.cbi.mosaichunter.math.FishersExactTest;
 
 public class MosaicFilter extends BaseFilter {
 
     public static final int DEFAULT_MAX_DEPTH = 500;
     
-    // TODO must less than 1000
     public static final int DEFAULT_ALPHA_PARAM = -1;
     public static final int DEFAULT_BETA_PARAM = -1;
     
@@ -36,7 +36,8 @@ public class MosaicFilter extends BaseFilter {
 
     public static final double LOGZERO = -1e100;
 
-    public static final double[] DEFAULT_BASE_CHANGE_RATE = new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }; // A, C, G, T
+    public static final double[] DEFAULT_BASE_CHANGE_RATE = 
+            new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }; // A, C, G, T
 
     private double[][] beta = null;
     private static double[][] c = null;
@@ -60,13 +61,13 @@ public class MosaicFilter extends BaseFilter {
     private final String controlIndexFile;
     private final double controlFisherThreshold;
     
+    private final String dbSnpFile;    
+    
     public final double deNovoRate;
     public final double mosaicRate;
     public final double unknownAF;
     public final double novelAF;
 
-    // TODO: New naive mode, added by Adam_Yyx, 2015-03-09 updated
-    // public final int naiveMode = 8;
     public final double[] genotypeChangeRate_autosome = new double[16];
     public double[] log10_genotypeChangeRate_autosome = new double[16];
     public final double[] genotypeChangeRate_maleSexChr = new double[16];
@@ -101,7 +102,8 @@ public class MosaicFilter extends BaseFilter {
             ConfigManager.getInstance().getDouble(name, "de_novo_rate", DEFAULT_DE_NOVO_RATE), 
             ConfigManager.getInstance().getDouble(name, "mosaic_rate", DEFAULT_MOSAIC_RATE), 
             ConfigManager.getInstance().getDouble(name, "unknown_af", DEFAULT_UNKNOWN_AF), 
-            ConfigManager.getInstance().getDouble(name, "novel_af", DEFAULT_NOVEL_AF));
+            ConfigManager.getInstance().getDouble(name, "novel_af", DEFAULT_NOVEL_AF),
+            ConfigManager.getInstance().get(name, "dbsnp_file", null));
     }
 
     public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, 
@@ -110,7 +112,8 @@ public class MosaicFilter extends BaseFilter {
             String fatherBamFile, String fatherIndexFile, 
             String motherBamFile, String motherIndexFile, String controlBamFile,
             String controlIndexFile, double controlFisherThreshold,
-            double deNovoRate, double mosaicRate, double unknownAF, double novelAF) {
+            double deNovoRate, double mosaicRate, double unknownAF, double novelAF,
+            String dbSnpFile) {
         super(name);
         this.maxDepth = maxDepth;
         this.alphaParam = alphaParam;
@@ -133,6 +136,7 @@ public class MosaicFilter extends BaseFilter {
         this.mosaicRate = mosaicRate;
         this.unknownAF = unknownAF;
         this.novelAF = novelAF;
+        this.dbSnpFile = dbSnpFile;
 
         // TODO: New naive mode, added by Adam_Yyx, 2015-03-09 updated
 
@@ -264,6 +268,58 @@ public class MosaicFilter extends BaseFilter {
     }
     
     @Override
+    public boolean validate() {
+        boolean ok = true;
+        if (!Validator.validateStringEnum(
+                getName() + ".mode", 
+                mode, 
+                new String[] {"single", "heterozygous", "trio", "paired_naive", "paired_fisher"}, 
+                false)) {
+            ok = false;     
+        }
+        if (!Validator.validateStringEnum(
+                getName() + ".sex", 
+                sex, 
+                new String[] {"M", "F"}, 
+                true)) {
+            ok = false;     
+        }
+        if (!Validator.validateFileExists(getName() + ".dbsnp_file", dbSnpFile, false)) {
+            ok = false;
+        }
+        if (isTrio()) {
+            if (!Validator.validateFileExists(
+                    getName() + ".father_bam_file", fatherBamFile, true)) {
+                ok = false;
+            }
+            if (!Validator.validateFileExists(
+                    getName() + ".mother_bam_file", motherBamFile, true)) {
+                ok = false;
+            }
+            if (!Validator.validateFileExists(
+                    getName() + ".father_index_file", fatherIndexFile, false)) {
+                ok = false;
+            }
+            if (!Validator.validateFileExists(
+                    getName() + ".mother_index_file", motherIndexFile, false)) {
+                ok = false;
+            }
+        }
+        
+        if (isPairedNaive() || isPairedFisher()) {
+            if (!Validator.validateFileExists(
+                    getName() + ".control_bam_file", controlBamFile, true)) {
+                ok = false;
+            }
+            if (!Validator.validateFileExists(
+                    getName() + ".control_index_file", controlIndexFile, false)) {
+                ok = false;
+            }
+        }
+        return ok;
+    }
+    
+    @Override
     public void init(MosaicHunterContext context) throws Exception {
         super.init(context);
         if (beta == null) {
@@ -341,7 +397,6 @@ public class MosaicFilter extends BaseFilter {
             }
         }
 
-        String dbSnpFile = ConfigManager.getInstance().get(getName(), "dbsnp_file", null);
         if (dbSnpFile != null && !dbSnpFile.trim().isEmpty()) {
             BufferedReader reader = new BufferedReader(new FileReader(dbSnpFile));
             dbSnpReader = new DbSnpReader(reader);
@@ -486,8 +541,6 @@ public class MosaicFilter extends BaseFilter {
         // 5,7: only focus on mosaic; 6,8: sum all difference
         // 5,6: no prior; 7,8: use prior
 
-        // only retain naiveMode 8
-        // if (naiveMode >= 5 && naiveMode <= 8) {
         boolean isAutosome = true;
         String chr = site.getRefName();
         if ((!chr.equals("X") && !chr.equals("Y")) || (chr.equals("X") && sex.equals("F"))) {
@@ -511,9 +564,7 @@ public class MosaicFilter extends BaseFilter {
                         ancestorCaseControlJointPosterior[n * 4 * 4 + i * 4 + j] = caseLikelihood[i] + controlLikelihood[j]
                                 + log10_genotypeChangeRate_maleSexChr[n * 4 + i] + log10_genotypeChangeRate_maleSexChr[n * 4 + j];
                     }
-                    // if (((naiveMode - 1) & 0x2) > 0) { // 7,8
                     ancestorCaseControlJointPosterior[n * 4 * 4 + i * 4 + j] += prior[n];
-                    // }
                     sumPosteriorNormalizationFactor = expAdd(sumPosteriorNormalizationFactor, ancestorCaseControlJointPosterior[n * 4 * 4
                             + i * 4 + j]);
                 }
@@ -580,9 +631,6 @@ public class MosaicFilter extends BaseFilter {
             cnt[102]++;
             return -1;
         }
-
-        // System.out.println(this.buildOutput(father));
-        // System.out.println(this.buildOutput(mother));
 
         if (father == null) {
             cnt[103]++;

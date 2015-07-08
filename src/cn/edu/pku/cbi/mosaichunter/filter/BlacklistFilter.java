@@ -51,7 +51,7 @@ public class BlacklistFilter extends BaseFilter {
             if (reader != null) {
                 reader.close();
             }
-        }        
+        }   
     }
     
     @Override

@@ -51,6 +51,10 @@ abstract public class BaseFilter implements Filter {
         return passedSites;
     }
     
+    public boolean validate() {
+        return true;
+    }
+    
     public void init(MosaicHunterContext context) throws Exception {
         this.context = context;
         if (outputFiltered) {
@@ -60,7 +64,7 @@ abstract public class BaseFilter implements Filter {
         if (outputPassed) {
             makeOutputDir();
             passedWriter = new FileWriter(new File(outputDir, name + ".passed.tsv"));
-        }        
+        }   
     }
     
     private void makeOutputDir() {
