@@ -1,7 +1,9 @@
 package cn.edu.pku.cbi.mosaichunter;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -131,15 +133,25 @@ public class MosaicHunter {
             return false;
         }
         
+        
+        InputStream in = null;
+
         if (configFile == null || configFile.trim().isEmpty()) {
             configFile = cmd.getOptionValue("C");
+            if (configFile != null && new File(configFile).isFile()) { 
+                in = new FileInputStream(configFile);
+            }
+        } else {
+            in = MosaicHunter.class.getClassLoader().getResourceAsStream(configFile);
         }
-        if (configFile != null) {
+        if (in != null) {
             try {
-                ConfigManager.getInstance().loadProperties(configFile); 
+                ConfigManager.getInstance().loadProperties(in); 
             } catch (IOException ioe) {
                System.out.println("invalid config file: " + configFile); 
                return false;
+            } finally {
+                in.close();
             }
         }
         

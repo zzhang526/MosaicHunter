@@ -2,6 +2,8 @@ package cn.edu.pku.cbi.mosaichunter.config;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Properties;
@@ -155,6 +157,11 @@ public class ConfigManager {
         } finally {
             reader.close();
         }
+    }
+    
+    public void loadProperties(InputStream configFileStream) throws IOException {
+        InputStreamReader reader = new InputStreamReader(configFileStream);
+        properties.load(reader);
     }
     
     public Double getDouble(String namespace, String name) {

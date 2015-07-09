@@ -6,7 +6,7 @@ public class MosaicHunterConfig {
     
     public static final MosaicHunterConfig GENOME = new MosaicHunterConfig(
             "genome",
-            "conf/genome.properties",
+            "genome.properties",
             new String[] {"This mode is for genome data."},
             new String[] {""},
             new Parameter[] {
@@ -28,7 +28,7 @@ public class MosaicHunterConfig {
     
     public static final MosaicHunterConfig EXOME = new MosaicHunterConfig(
             "exome",
-            "conf/exome.properties",
+            "exome.properties",
             new String[] {"This mode is for exome data."},
             new String[] {""},
             new Parameter[] {
@@ -51,7 +51,7 @@ public class MosaicHunterConfig {
     
     public static final MosaicHunterConfig EXOME_PARAMETERS = new MosaicHunterConfig(
             "exome_parameters",
-            "conf/exome_parameters.properties",
+            "exome_parameters.properties",
             new String[] {"Calculates parameters for exome data."},
             null,
             new Parameter[] {
