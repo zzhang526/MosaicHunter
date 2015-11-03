@@ -48,6 +48,7 @@ public class MosaicFilter extends BaseFilter {
     private final int minReadQuality;
     private final int minMappingQuality;
     private final boolean removeDuplicates;
+    private final int removeFlags;
     private final String mode;
     private final String sex;
     private final double[] baseChangeRate;
@@ -86,6 +87,7 @@ public class MosaicFilter extends BaseFilter {
             ConfigManager.getInstance().getInt(null, "min_read_quality", DEFAULT_MIN_READ_QUALITY), 
             ConfigManager.getInstance().getInt(null, "min_mapping_quality", DEFAULT_MIN_MAPPING_QUALITY), 
             ConfigManager.getInstance().getBoolean(null, "removeDuplicates", true), 
+            ConfigManager.getInstance().getIntFlags(null, "remove_flags", 0),
             ConfigManager.getInstance().get(name, "mode"), 
             ConfigManager.getInstance().getInt(name, "alpha_param", DEFAULT_ALPHA_PARAM), 
             ConfigManager.getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), 
@@ -107,7 +109,7 @@ public class MosaicFilter extends BaseFilter {
     }
 
     public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, 
-            boolean removeDuplicates, String mode, int alphaParam, int betaParam, String sex,
+            boolean removeDuplicates, int removeFlags, String mode, int alphaParam, int betaParam, String sex,
             double[] baseChangeRate, double mosaicThreshold, 
             String fatherBamFile, String fatherIndexFile, 
             String motherBamFile, String motherIndexFile, String controlBamFile,
@@ -121,6 +123,7 @@ public class MosaicFilter extends BaseFilter {
         this.minReadQuality = minReadQuality;
         this.minMappingQuality = minMappingQuality;
         this.removeDuplicates = removeDuplicates;
+        this.removeFlags = removeFlags;
         this.mode = mode == null ? "single" : mode.trim();
         this.sex = sex;
         this.baseChangeRate = baseChangeRate;
@@ -336,7 +339,7 @@ public class MosaicFilter extends BaseFilter {
             }
             controlSiteReader = new BamSiteReader(
                 getContext().getReferenceManager(), controlBamFile, controlIndexFile, 
-                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates, removeFlags);
             controlSiteReader.init();
         } else if (isTrio()) {
             if (fatherBamFile == null) {
@@ -348,12 +351,12 @@ public class MosaicFilter extends BaseFilter {
 
             fatherSiteReader = new BamSiteReader(
                 getContext().getReferenceManager(), fatherBamFile, fatherIndexFile, 
-                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates, removeFlags);
             fatherSiteReader.init();
 
             motherSiteReader = new BamSiteReader(
                 getContext().getReferenceManager(), motherBamFile, motherIndexFile, 
-                maxDepth, minReadQuality, minMappingQuality, removeDuplicates);
+                maxDepth, minReadQuality, minMappingQuality, removeDuplicates, removeFlags);
             motherSiteReader.init();
         }
     }

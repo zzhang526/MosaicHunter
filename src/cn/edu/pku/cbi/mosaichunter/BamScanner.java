@@ -40,6 +40,7 @@ public class BamScanner {
     private final int maxDepth;
     private final int maxSites;
     private final boolean removeDuplicates;
+    private final int removeFlags;
     private final Filter inProcessFilter;
     private final Filter postProcessFilter;  
     private final long seed;
@@ -57,6 +58,7 @@ public class BamScanner {
              ConfigManager.getInstance().getInt(null, "max_depth"),
              ConfigManager.getInstance().getInt(null, "max_sites", 500000),
              ConfigManager.getInstance().getBoolean(null, "remove_duplicates", true),
+             ConfigManager.getInstance().getIntFlags(null, "remove_flags", 0),
              ConfigManager.getInstance().getLong(null, "seed", System.currentTimeMillis()),
              ConfigManager.getInstance().getBoolean(null, "depth_sampling", false)
              );        
@@ -64,7 +66,8 @@ public class BamScanner {
     
     public BamScanner(String inputFile, String indexFile, String referenceFile, 
             Filter inProcessFilter, Filter postProcessFilter, int maxDepth, 
-            int maxSites, boolean removeDuplicates, long seed, boolean depthSampling) 
+            int maxSites, boolean removeDuplicates, int removeFlags, 
+            long seed, boolean depthSampling) 
                     throws Exception {
         this.inputFile = inputFile;
         this.indexFile = indexFile;
@@ -74,6 +77,7 @@ public class BamScanner {
         this.maxDepth = maxDepth;
         this.maxSites = maxSites;
         this.removeDuplicates = removeDuplicates;
+        this.removeFlags = removeFlags;
         this.seed = seed;
         this.depthSampling = depthSampling;
         this.random = new Random(this.seed);
@@ -287,6 +291,9 @@ public class BamScanner {
                     }
                     
                     if (read.getDuplicateReadFlag() && removeDuplicates) {
+                        continue;
+                    }
+                    if ((read.getFlags() & removeFlags) != 0) {
                         continue;
                     }
                     if (read.getMappingQuality() < minMappingQuality) {

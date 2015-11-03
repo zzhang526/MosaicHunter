@@ -69,7 +69,12 @@ public class CompleteLinkageFilter extends BaseFilter {
                 }
             } else if (mates[i] == null) {
                 StatsManager.count("mate_miss", 1);
-                SAMRecord m = getContext().getSAMFileReader().queryMate(reads[i]);
+                SAMRecord m = null;
+                try {
+                    m = getContext().getSAMFileReader().queryMate(reads[i]);
+                } catch (Exception e) {
+                    StatsManager.count("mate_multiple", 1);
+                }
                 if (m != null && m.getAlignmentStart() != reads[i].getAlignmentStart()) {
                     mates[i] = m;
                     StatsManager.count("mate_miss_true", 1);

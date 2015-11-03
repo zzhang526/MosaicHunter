@@ -106,6 +106,18 @@ public class ConfigManager {
         return Integer.parseInt(value);
     }
     
+    public Integer getIntFlags(String namespace, String name, Integer defaultValue) {
+        String value = get(namespace, name);
+        if (value == null || value.length() == 0) {
+            return defaultValue;
+        }
+        value = value.trim().toLowerCase();
+        if (value.startsWith("0x")) {
+            return Integer.parseInt(value.substring(2), 16);
+        }
+        return Integer.parseInt(value);
+    }
+    
     public int[] getInts(String namespace, String name) {
         return getInts(namespace, name, null);
     }
