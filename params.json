@@ -1,0 +1,6 @@
+{
+  "name": "MosaicHunter",
+  "tagline": "A tool to detect postzygotic single-nucleotide mosaicism from unpaired, trio, or paired samples.",
+  "body": "MosaicHunter \r\n============\r\nA tool to detect postzygotic single-nucleotide mosaicism from unpaired, trio, or paired samples.\r\nSee http://mosaichunter.cbi.pku.edu.cn/",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
