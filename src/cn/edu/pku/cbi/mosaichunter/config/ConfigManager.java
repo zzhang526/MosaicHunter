@@ -44,7 +44,23 @@ public class ConfigManager {
     public static ConfigManager getInstance() {
         return instance;
     }
-    
+
+    private String checkDir(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.startsWith("~")) {
+            return System.getProperty("user.home") + value.substring(1);
+        }
+        return value;
+    }
+
+    private void checkDirs() {
+        for (String key : properties.stringPropertyNames()) {
+            properties.setProperty(key, checkDir(properties.getProperty(key))); 
+        }
+    }
+ 
     public Properties getProperties() {
         return properties;
     }
@@ -54,16 +70,18 @@ public class ConfigManager {
     }
     
     public void set(String name, String value) {
-        properties.setProperty(name, value);
+        properties.setProperty(name, checkDir(value));
     }
     
     public void set(String namespace, String name, String value) {
-        properties.setProperty(namespace + "." + name, value);
+        properties.setProperty(namespace + "." + name, checkDir(value));
     }
-    
+
     public void putAll(Properties p) {
         properties.putAll(p);
+        checkDirs();
     }
+
     public String get(String name) {
         return properties.getProperty(name);
     }
@@ -80,7 +98,6 @@ public class ConfigManager {
         }
         return value;
     }
-    
     
     public String[] getValues(String name) {
         return getValues(null, name);
@@ -190,6 +207,7 @@ public class ConfigManager {
         FileReader reader = new FileReader(configFile);
         try {
             properties.load(reader);
+            checkDirs();
         } finally {
             reader.close();
         }
@@ -198,6 +216,7 @@ public class ConfigManager {
     public void loadProperties(InputStream configFileStream) throws IOException {
         InputStreamReader reader = new InputStreamReader(configFileStream);
         properties.load(reader);
+        checkDirs();
     }
     
     public Double getDouble(String namespace, String name) {
