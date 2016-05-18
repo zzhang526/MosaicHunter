@@ -3,10 +3,12 @@ log/*
 data/*
 tmp/*
 build/*
+output/*
 
 # eclipse
 .classpath
 .project
+.settings
 
 *.class
 
