@@ -556,11 +556,13 @@ public class MosaicFilter extends BaseFilter {
 
         boolean isAutosome = true;
         String chr = site.getRefName();
-        if ((!chr.equals("X") && !chr.equals("Y")) || (chr.equals("X") && sex.equals("F"))) {
+        boolean isXChr = MosaicHunterHelper.isChrX(chr);
+        boolean isYChr = MosaicHunterHelper.isChrY(chr);
+        if ((!isXChr && !isYChr) || (isXChr && sex.equals("F"))) {
             isAutosome = true;
-        } else if (chr.equals("X") && sex.equals("M")) {
+        } else if (isXChr && sex.equals("M")) {
             isAutosome = false;
-        } else if (chr.equals("Y") && sex.equals("M")) {
+        } else if (isYChr && sex.equals("M")) {
             isAutosome = false;
         } else {
             return false;
@@ -713,9 +715,13 @@ public class MosaicFilter extends BaseFilter {
                         "M(" + (char) mother.getMajorAllele() + ":" + mother.getMajorAlleleCount() + "," + (char) mother.getMinorAllele()
                                 + ":" + mother.getMinorAlleleCount() + ")",
 
-                        childLikelihood[0], childLikelihood[1], childLikelihood[2], childLikelihood[3], fatherPosterior[0],
-                        fatherPosterior[1], fatherPosterior[2], fatherPosterior[3], motherPosterior[0], motherPosterior[1],
-                        motherPosterior[2], motherPosterior[3], childPosterior[0], childPosterior[1], childPosterior[2], childPosterior[3],
+                        childLikelihood[0], childLikelihood[1], childLikelihood[2], childLikelihood[3], 
+                        fatherPosterior[0],
+                        fatherPosterior[1], fatherPosterior[2], fatherPosterior[3], 
+                        motherPosterior[0], motherPosterior[1],
+                        motherPosterior[2], motherPosterior[3], 
+                        
+                        childPosterior[0], childPosterior[1], childPosterior[2], childPosterior[3],
                         mosaic, childLikelihood[3] - childLikelihood[1]});
         return mosaic;
     }
