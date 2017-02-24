@@ -40,6 +40,7 @@ import java.util.Set;
 
 import net.sf.samtools.AlignmentBlock;
 import net.sf.samtools.SAMRecord;
+import cn.edu.pku.cbi.mosaichunter.MosaicHunterHelper;
 import cn.edu.pku.cbi.mosaichunter.Site;
 import cn.edu.pku.cbi.mosaichunter.config.ConfigManager;
 import cn.edu.pku.cbi.mosaichunter.config.Validator;
@@ -239,7 +240,7 @@ public class MisalignedReadsFilter extends BaseFilter {
         if (alignment.count > 1) {
             return AlignmentResult.MULTIPLE_ALIGNMENTS;
         }
-        if (!alignment.chr.equals(chr)) {
+        if (!MosaicHunterHelper.isSameChr(alignment.chr, chr)) {
             return AlignmentResult.CHROM_MISMATCH;
         }
         
@@ -353,9 +354,6 @@ public class MisalignedReadsFilter extends BaseFilter {
                  AlignmentEntry entry = new AlignmentEntry();
                  String id = tokens[9];
                  entry.chr = tokens[13];
-                 if (entry.chr.startsWith("chr")) {
-                     entry.chr = entry.chr.substring(3); 
-                 }
                  entry.score = Integer.parseInt(tokens[0]) +
                                Integer.parseInt(tokens[2]) - 
                                Integer.parseInt(tokens[1]) - 

@@ -67,6 +67,19 @@ public class MosaicHunterHelper {
         return isChr(chrName, chrYName);
     }
     
+    public static boolean isSameChr(String chr1, String chr2) {
+        if (chr1 == null) {
+            return chr2 == null;
+        }
+        if (chr1.toLowerCase().startsWith("chr")) {
+            chr1 = chr1.substring(3); 
+        }
+        if (chr2.toLowerCase().startsWith("chr")) {
+            chr2 = chr2.substring(3); 
+        }
+        return chr1.equals(chr2);
+    }
+    
     public static boolean isChr(String chrName, String expectedChrName) {
         return expectedChrName != null && 
                expectedChrName.length() > 0 && 
