@@ -32,10 +32,16 @@ public class BaseNumberFilter extends BaseFilter {
     public static final int DEFAULT_MIN_MINOR_ALLELE_NUMBER = 5;
     public static final double DEFAULT_MIN_MINOR_ALLELE_PERCENTAGE = 5;
     public static final double DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE = 100;
+	public static final boolean DEFAULT_OMIT_ALT_HOMOZYGOUS = true;
+	public static final int DEFAULT_MIN_READ_GROUP_NUMBER = 1;
+	public static final int DEFAULT_MAX_READ_GROUP_NUMBER = 1000;
     
     private final int minMinorAlleleNumber;
     private final double minMinorAllelePercentage;
     private final double maxMinorAllelePercentage;
+	private final boolean omitAltHomozygous;
+	private final int minReadGroupNumber;
+	private final int maxReadGroupNumber;
     
     public BaseNumberFilter(String name) {
         this(name,
@@ -44,24 +50,97 @@ public class BaseNumberFilter extends BaseFilter {
              ConfigManager.getInstance().getDouble(
                      name, "min_minor_allele_percentage", DEFAULT_MIN_MINOR_ALLELE_PERCENTAGE),
              ConfigManager.getInstance().getDouble(
-                     name, "max_minor_allele_percentage", DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE));
+                     name, "max_minor_allele_percentage", DEFAULT_MAX_MINOR_ALLELE_PERCENTAGE),
+             ConfigManager.getInstance().getBoolean(
+                     name, "omit_alt_homozygous", DEFAULT_OMIT_ALT_HOMOZYGOUS),
+			 ConfigManager.getInstance().getInt(
+                     name, "min_read_group_number", DEFAULT_MIN_READ_GROUP_NUMBER),
+			 ConfigManager.getInstance().getInt(
+                     name, "max_read_group_number", DEFAULT_MAX_READ_GROUP_NUMBER));
     }
     
     public BaseNumberFilter(String name, int minMinorAlleleNumber, 
-            double minMinorAllelePercentage, double maxMinorAllelePercentage) {
+            double minMinorAllelePercentage, double maxMinorAllelePercentage,
+			boolean omitAltHomozygous, int minReadGroupNumber,
+			int maxReadGroupNumber) {
         super(name);
         this.minMinorAlleleNumber = minMinorAlleleNumber;
         this.minMinorAllelePercentage = minMinorAllelePercentage / 100.0;
         this.maxMinorAllelePercentage = maxMinorAllelePercentage / 100.0;
+		this.omitAltHomozygous = omitAltHomozygous;
+		this.minReadGroupNumber = minReadGroupNumber;
+		this.maxReadGroupNumber = maxReadGroupNumber;
     }
     
     @Override
     public boolean doFilter(Site site) {
-        return site.getMinorAlleleCount() >= minMinorAlleleNumber &&
-               site.getMinorAlleleCount() >= 
-                       site.getDepth() * minMinorAllelePercentage &&
-               site.getMinorAlleleCount() <
-                       site.getDepth() * maxMinorAllelePercentage;
-    }
-    
+		if (!omitAltHomozygous) {
+			if (site.getRef() == site.getMajorAllele()) {
+				if (site.getMinorAlleleCount() >= minMinorAlleleNumber &&
+					site.getMinorAlleleCount() >= 
+                               site.getDepth() * minMinorAllelePercentage &&
+					site.getMinorAlleleCount() <=
+                               site.getDepth() * maxMinorAllelePercentage) {
+					if (minReadGroupNumber > 1 || maxReadGroupNumber < 1000) {
+						site.setMetadata(
+							   getName(),
+							   new Object[] {
+									site.getMajorReadGroupCount()});
+						return site.getMinorReadGroupCount() >= minReadGroupNumber &&
+							   site.getMinorReadGroupCount() <= maxReadGroupNumber;
+					}
+					else {
+						return true;
+					}
+				}
+				else {
+					return false;
+				}
+			}
+			else {
+				if (site.getMajorAlleleCount() >= minMinorAlleleNumber &&
+					site.getMajorAlleleCount() >= 
+                               site.getDepth() * minMinorAllelePercentage &&
+					site.getMajorAlleleCount() <=
+                               site.getDepth() * maxMinorAllelePercentage) {
+					if (minReadGroupNumber > 1 || maxReadGroupNumber < 1000) {
+						site.setMetadata(
+							   getName(),
+							   new Object[] {
+									site.getMajorReadGroupCount()});
+						return site.getMajorReadGroupCount() >= minReadGroupNumber &&
+							   site.getMajorReadGroupCount() <= maxReadGroupNumber;
+					}
+					else {
+						return true;
+					}	
+				}
+				else {
+					return false;
+				}
+			}
+		}
+        else {
+			if (site.getMinorAlleleCount() >= minMinorAlleleNumber &&
+				site.getMinorAlleleCount() >= 
+                           site.getDepth() * minMinorAllelePercentage &&
+				site.getMinorAlleleCount() <=
+                           site.getDepth() * maxMinorAllelePercentage) {
+				if (minReadGroupNumber > 1 || maxReadGroupNumber < 1000) {
+					site.setMetadata(
+						   getName(),
+						   new Object[] {
+								site.getMinorReadGroupCount()});
+					return site.getMinorReadGroupCount() >= minReadGroupNumber &&
+						   site.getMinorReadGroupCount() <= maxReadGroupNumber;
+				}
+				else {
+					return true;
+				}
+			}
+			else {
+				return false;
+			}
+		}
+	}
 }

@@ -62,6 +62,8 @@ public class MosaicFilter extends BaseFilter {
 
     public static final double[] DEFAULT_BASE_CHANGE_RATE = 
             new double[] { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 }; // A, C, G, T
+			
+	public static final boolean DEFAULT_OMIT_ALT_HOMOZYGOUS = true;
 
     private double[][] beta = null;
     private static double[][] c = null;
@@ -76,6 +78,8 @@ public class MosaicFilter extends BaseFilter {
     private final String mode;
     private final String sex;
     private final double[] baseChangeRate;
+	private final boolean omitAltHomozygous;
+	
     private final double mosaicThreshold;
     private final String fatherBamFile;
     private final String fatherIndexFile;
@@ -117,7 +121,8 @@ public class MosaicFilter extends BaseFilter {
             ConfigManager.getInstance().getInt(name, "beta_param", DEFAULT_BETA_PARAM), 
             ConfigManager.getInstance().get(name, "sex", DEFAULT_SEX),
             ConfigManager.getInstance().getDoubles(name, "base_change_rate", DEFAULT_BASE_CHANGE_RATE), 
-            ConfigManager.getInstance().getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD),
+            ConfigManager.getInstance().getBoolean(name, "omit_alt_homozygous", DEFAULT_OMIT_ALT_HOMOZYGOUS),
+			ConfigManager.getInstance().getDouble(name, "mosaic_threshold", DEFAULT_MOSAIC_THRESHOLD),
             ConfigManager.getInstance().get(name, "father_bam_file", null), 
             ConfigManager.getInstance().get(name, "father_index_file", null),
             ConfigManager.getInstance().get(name, "mother_bam_file", null), 
@@ -134,7 +139,7 @@ public class MosaicFilter extends BaseFilter {
 
     public MosaicFilter(String name, int maxDepth, int minReadQuality, int minMappingQuality, 
             boolean removeDuplicates, int removeFlags, String mode, int alphaParam, int betaParam, String sex,
-            double[] baseChangeRate, double mosaicThreshold, 
+            double[] baseChangeRate, boolean omitAltHomozygous, double mosaicThreshold, 
             String fatherBamFile, String fatherIndexFile, 
             String motherBamFile, String motherIndexFile, String controlBamFile,
             String controlIndexFile, double controlFisherThreshold,
@@ -151,6 +156,7 @@ public class MosaicFilter extends BaseFilter {
         this.mode = mode == null ? "single" : mode.trim();
         this.sex = sex;
         this.baseChangeRate = baseChangeRate;
+		this.omitAltHomozygous = omitAltHomozygous;
         this.mosaicThreshold = mosaicThreshold;
         this.fatherBamFile = fatherBamFile;
         this.fatherIndexFile = fatherIndexFile;
@@ -293,6 +299,10 @@ public class MosaicFilter extends BaseFilter {
     private boolean isPairedFisher() {
         return "paired_fisher".equalsIgnoreCase(mode);
     }
+	
+	private boolean isRNA() {
+        return "RNA".equalsIgnoreCase(mode);
+    }
     
     @Override
     public boolean validate() {
@@ -300,7 +310,7 @@ public class MosaicFilter extends BaseFilter {
         if (!Validator.validateStringEnum(
                 getName() + ".mode", 
                 mode, 
-                new String[] {"single", "heterozygous", "trio", "paired_naive", "paired_fisher"}, 
+                new String[] {"single", "heterozygous", "trio", "paired_naive", "paired_fisher", "RNA"}, 
                 false)) {
             ok = false;     
         }
@@ -459,6 +469,9 @@ public class MosaicFilter extends BaseFilter {
         } else if (isHeterozygous()) {
             double het = calcHeterozygous(site);
             pass = het > mosaicThreshold;
+		} else if (isRNA()) {
+			double nonref = calcNonHomozygous(site);
+			pass = nonref > mosaicThreshold;
         } else {
             double mosaic = isTrio() ? calcTrioMosaic(site) : calcIndividualMosaic(site);
             pass = mosaic > mosaicThreshold;
@@ -556,13 +569,11 @@ public class MosaicFilter extends BaseFilter {
 
         boolean isAutosome = true;
         String chr = site.getRefName();
-        boolean isXChr = MosaicHunterHelper.isChrX(chr);
-        boolean isYChr = MosaicHunterHelper.isChrY(chr);
-        if ((!isXChr && !isYChr) || (isXChr && sex.equals("F"))) {
+        if ((!chr.equals("X") && !chr.equals("Y")) || (chr.equals("X") && sex.equals("F"))) {
             isAutosome = true;
-        } else if (isXChr && sex.equals("M")) {
+        } else if (chr.equals("X") && sex.equals("M")) {
             isAutosome = false;
-        } else if (isYChr && sex.equals("M")) {
+        } else if (chr.equals("Y") && sex.equals("M")) {
             isAutosome = false;
         } else {
             return false;
@@ -715,13 +726,9 @@ public class MosaicFilter extends BaseFilter {
                         "M(" + (char) mother.getMajorAllele() + ":" + mother.getMajorAlleleCount() + "," + (char) mother.getMinorAllele()
                                 + ":" + mother.getMinorAlleleCount() + ")",
 
-                        childLikelihood[0], childLikelihood[1], childLikelihood[2], childLikelihood[3], 
-                        fatherPosterior[0],
-                        fatherPosterior[1], fatherPosterior[2], fatherPosterior[3], 
-                        motherPosterior[0], motherPosterior[1],
-                        motherPosterior[2], motherPosterior[3], 
-                        
-                        childPosterior[0], childPosterior[1], childPosterior[2], childPosterior[3],
+                        childLikelihood[0], childLikelihood[1], childLikelihood[2], childLikelihood[3], fatherPosterior[0],
+                        fatherPosterior[1], fatherPosterior[2], fatherPosterior[3], motherPosterior[0], motherPosterior[1],
+                        motherPosterior[2], motherPosterior[3], childPosterior[0], childPosterior[1], childPosterior[2], childPosterior[3],
                         mosaic, childLikelihood[3] - childLikelihood[1]});
         return mosaic;
     }
@@ -809,6 +816,52 @@ public class MosaicFilter extends BaseFilter {
         return het;
     }
 
+	private double calcNonHomozygous(Site site) {
+
+        int majorId = site.getMajorAlleleId();
+        int minorId = site.getMinorAlleleId();
+
+        double[] af = getAF(site);
+        if (af == null) {
+            return 0;
+        }
+
+		double[] prior = calcPrior(af, af, site, sex, majorId, minorId);
+        double[] likelihood = calcLikelihood(site, majorId, minorId);
+        double[] posterior = calcPosterior(majorId, minorId, likelihood, prior);
+        if (posterior == null) {
+            return 0;
+        }
+
+		if (!omitAltHomozygous) {
+			if (site.getRef() == site.getMajorAllele()) {
+				site.setMetadata(getName(), new Object[] {
+						(char) getBase(majorId) + "(" + formatAF(af[majorId]) + "):" + (char) getBase(minorId) + "(" + formatAF(af[minorId])
+								+ ")", prior[0], prior[1], prior[2], prior[3], likelihood[0], likelihood[1], likelihood[2], likelihood[3],
+						posterior[0], posterior[1], posterior[2], posterior[3], 1 - Math.pow(10, posterior[0]) });
+	
+				double nonref = 1 - Math.pow(10, posterior[0]); 
+				return nonref;
+			} else {
+				site.setMetadata(getName(), new Object[] {
+						(char) getBase(majorId) + "(" + formatAF(af[majorId]) + "):" + (char) getBase(minorId) + "(" + formatAF(af[minorId])
+								+ ")", prior[0], prior[1], prior[2], prior[3], likelihood[0], likelihood[1], likelihood[2], likelihood[3],
+						posterior[0], posterior[1], posterior[2], posterior[3], 1 - Math.pow(10, posterior[2]) });
+				
+				double nonref = 1 - Math.pow(10, posterior[2]);
+				return nonref;
+			}
+		} else {
+			site.setMetadata(getName(), new Object[] {
+					(char) getBase(majorId) + "(" + formatAF(af[majorId]) + "):" + (char) getBase(minorId) + "(" + formatAF(af[minorId])
+							+ ")", prior[0], prior[1], prior[2], prior[3], likelihood[0], likelihood[1], likelihood[2], likelihood[3],
+					posterior[0], posterior[1], posterior[2], posterior[3], Math.pow(10, posterior[1]) + Math.pow(10, posterior[3]) });
+				
+			double nonref = Math.pow(10, posterior[1]) + Math.pow(10, posterior[3]);
+			return nonref;
+		}    
+    }
+	
     private double[] calcIndividualPosterior(Site site, boolean setMetadata) {
         byte majorAllele = site.getMajorAllele();
         byte minorAllele = site.getMinorAllele();
@@ -1043,7 +1096,6 @@ public class MosaicFilter extends BaseFilter {
         }
 
         public double[] getAF(String chrName, long pos) {
-
             int chrId = getContext().getReferenceManager().getReferenceId(chrName);
             if (chrId < 0) {
                 return null;
@@ -1085,9 +1137,9 @@ public class MosaicFilter extends BaseFilter {
                 currentTokens = currentLine.split("\\t");
                 if (!currentTokens[0].equals(currentName)) {
                     currentName = currentTokens[0];
+					currentPos = 0;
                     currentChrId = getContext().getReferenceManager().getReferenceId(currentName);
                     if (currentChrId < 0) {
-                        done = true;
                         return;
                     }
                 }

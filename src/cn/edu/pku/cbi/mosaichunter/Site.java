@@ -72,7 +72,9 @@ public class Site {
     private int negativeAlleleCount = -1;
     private int negativeMajorAlleleCount = -1;    
     private int negativeMinorAlleleCount = -1;
-    
+	private int majorReadGroupCount = -1;
+    private int minorReadGroupCount = -1;
+	
     private String alleleCountOrder;
 
     public Site(int maxDepth) {
@@ -128,12 +130,14 @@ public class Site {
         }
         metadata.clear();
         passedFilters.clear();
+		
         alleleCount[0] = 0;
         alleleCount[1] = 0;
         alleleCount[2] = 0;
         alleleCount[3] = 0;
         
         majorAllele = -1;
+		majorReadGroupCount = -1;
     }
     
     public void copy(Site that) {
@@ -151,7 +155,6 @@ public class Site {
     }
     
     public void addRead(SAMRecord read, short pos) {
-
         if (depth >= maxDepth) {
             return;
         }
@@ -159,11 +162,10 @@ public class Site {
         reads[depth] = read;
         basePos[depth] = pos;
         //bases[depth] = base;
-        //baseQualities[depth] = baseQ;
-        
+        //baseQualities[depth] = baseQ;   
         depth++;
         majorAllele = -1;
-        
+		majorReadGroupCount = -1;	
     }
     
     public void replaceRead(int i, SAMRecord read, short pos) {
@@ -172,6 +174,7 @@ public class Site {
         reads[i] = read;
         basePos[i] = pos;
         majorAllele = -1;
+		majorReadGroupCount = -1;
     }
     
     public int getMaxDepth() {
@@ -325,55 +328,114 @@ public class Site {
         }
         return alleleCountOrder;
     }
-    
+	
+	public int getMajorReadGroupCount() {
+		if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
+		if (majorReadGroupCount < 0) {
+			calculateReadGroupCounts();
+		}
+        return majorReadGroupCount;
+    }
+
+    public int getMinorReadGroupCount() {
+		if (majorAllele < 0) {
+            calculateAlleleCounts();
+        }
+		if (majorReadGroupCount < 0) {
+			calculateReadGroupCounts();
+		}
+        return minorReadGroupCount;
+    }
+	
     private void calculateAlleleCounts() {    
-        int[] negativeAlleleCounts = new int[4];
-
-        positiveAlleleCount = 0;
-        negativeAlleleCount = 0;
-        
+		int[] negativeAlleleCounts = new int[4];
+	
+		positiveAlleleCount = 0;
+		negativeAlleleCount = 0;
+		
+		for (int i = 0; i < depth; ++i) { 
+			bases[i] = reads[i].getReadBases()[basePos[i]];
+			baseQualities[i] = reads[i].getBaseQualities()[basePos[i]];
+	
+			alleleCount[alleleId[bases[i]]]++;
+			if (reads[i].getReadNegativeStrandFlag()) {
+				negativeAlleleCounts[alleleId[bases[i]]]++;
+				negativeAlleleCount++;
+			} else {
+				positiveAlleleCount++;
+			}
+		}
+		
+		int[] allele = new int[] {0, 1, 2, 3};
+		for (int i = 0; i < 3; ++i) {
+			for (int j = i + 1; j < 4; ++j) {
+				if (alleleCount[allele[i]] < alleleCount[allele[j]] ||
+					(alleleCount[allele[i]] == alleleCount[allele[j]] && allele[i] > allele[j])) {
+					int temp = allele[i];
+					allele[i] = allele[j];
+					allele[j] = temp;
+				}
+			}
+		}
+		
+		majorAllele = (byte) alleleIdOrder.charAt(allele[0]);
+		minorAllele = (byte) alleleIdOrder.charAt(allele[1]);
+		majorAlleleId = MosaicHunterHelper.BASE_TO_ID[majorAllele];
+		minorAlleleId = MosaicHunterHelper.BASE_TO_ID[minorAllele];
+	
+		majorAlleleCount = alleleCount[allele[0]];
+		minorAlleleCount = alleleCount[allele[1]];;
+		negativeMajorAlleleCount = negativeAlleleCounts[allele[0]];  
+		negativeMinorAlleleCount = negativeAlleleCounts[allele[1]];
+		positiveMajorAlleleCount = alleleCount[allele[0]] - negativeAlleleCounts[allele[0]];    
+		positiveMinorAlleleCount = alleleCount[allele[1]] - negativeAlleleCounts[allele[1]];
+		
+		alleleCountOrder = "" + 
+				alleleIdOrder.charAt(allele[0]) + 
+				alleleIdOrder.charAt(allele[1]) + 
+				alleleIdOrder.charAt(allele[2]) + 
+				alleleIdOrder.charAt(allele[3]);                 
+	}
+	
+	private void calculateReadGroupCounts() {    
+		HashMap readGroupA = new HashMap(1000);
+		HashMap readGroupC = new HashMap(1000);
+		HashMap readGroupG = new HashMap(1000);
+		HashMap readGroupT = new HashMap(1000);
+		
         for (int i = 0; i < depth; ++i) { 
-            bases[i] = reads[i].getReadBases()[basePos[i]];
-            baseQualities[i] = reads[i].getBaseQualities()[basePos[i]];
-
-            alleleCount[alleleId[bases[i]]]++;
-            if (reads[i].getReadNegativeStrandFlag()) {
-                negativeAlleleCounts[alleleId[bases[i]]]++;
-                negativeAlleleCount++;
-            } else {
-                positiveAlleleCount++;
-            }
+			if ((char) bases[i] == 'A') {
+				readGroupA.put(reads[i].getReadGroup().getSample(),null);
+			} else if ((char) bases[i] == 'C') {
+				readGroupC.put(reads[i].getReadGroup().getSample(),null);
+			} else if ((char) bases[i] == 'G') {
+				readGroupG.put(reads[i].getReadGroup().getSample(),null);
+			} else if ((char) bases[i] == 'T') {
+				readGroupT.put(reads[i].getReadGroup().getSample(),null);
+			}
         }
-        int[] allele = new int[] {0, 1, 2, 3};
-        for (int i = 0; i < 3; ++i) {
-            for (int j = i + 1; j < 4; ++j) {
-                if (alleleCount[allele[i]] < alleleCount[allele[j]] ||
-                    (alleleCount[allele[i]] == alleleCount[allele[j]] && allele[i] > allele[j])) {
-                    int temp = allele[i];
-                    allele[i] = allele[j];
-                    allele[j] = temp;
-                }
-                    
-            }
-        }
-        
-        majorAllele = (byte) alleleIdOrder.charAt(allele[0]);
-        minorAllele = (byte) alleleIdOrder.charAt(allele[1]);
-        majorAlleleId = MosaicHunterHelper.BASE_TO_ID[majorAllele];
-        minorAlleleId = MosaicHunterHelper.BASE_TO_ID[minorAllele];
-
-        majorAlleleCount = alleleCount[allele[0]];
-        minorAlleleCount = alleleCount[allele[1]];;
-        negativeMajorAlleleCount = negativeAlleleCounts[allele[0]];  
-        negativeMinorAlleleCount = negativeAlleleCounts[allele[1]];
-        positiveMajorAlleleCount = alleleCount[allele[0]] - negativeAlleleCounts[allele[0]];    
-        positiveMinorAlleleCount = alleleCount[allele[1]] - negativeAlleleCounts[allele[1]];
-        
-        alleleCountOrder = "" + 
-                alleleIdOrder.charAt(allele[0]) + 
-                alleleIdOrder.charAt(allele[1]) + 
-                alleleIdOrder.charAt(allele[2]) + 
-                alleleIdOrder.charAt(allele[3]);                 
+		
+		if ((char) majorAllele == 'A') {
+			majorReadGroupCount = readGroupA.size();
+		} else if ((char) majorAllele == 'C') {
+			majorReadGroupCount = readGroupC.size();
+		} else if ((char) majorAllele == 'G') {
+			majorReadGroupCount = readGroupG.size();
+		} else if ((char) majorAllele == 'T') {
+			majorReadGroupCount = readGroupT.size();
+		}
+		
+		if ((char) minorAllele == 'A') {
+			minorReadGroupCount = readGroupA.size();
+		} else if ((char) minorAllele == 'C') {
+			minorReadGroupCount = readGroupC.size();
+		} else if ((char) minorAllele == 'G') {
+			minorReadGroupCount = readGroupG.size();
+		} else if ((char) minorAllele == 'T') {
+			minorReadGroupCount = readGroupT.size();
+		}
     }
     
     public Set<String> getPassedFilters() {

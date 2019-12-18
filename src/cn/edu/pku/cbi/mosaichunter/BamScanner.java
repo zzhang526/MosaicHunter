@@ -333,6 +333,10 @@ public class BamScanner {
                     lastRefName = read.getReferenceName();
                     lastRefPos = read.getAlignmentStart();
                     byte[] bases = read.getReadBases();
+					byte[] quals = read.getBaseQualities();
+					if (bases.length != quals.length) {
+						continue;
+					}
                     for (AlignmentBlock block : read.getAlignmentBlocks()) {
                         int refPos = block.getReferenceStart();
                         for (int i = 0; i < block.getLength(); ++i, ++refPos) {
@@ -340,9 +344,11 @@ public class BamScanner {
                             if (posId < startPositionId || posId > endPositionId) {
                                 continue;
                             }
-
                             short basePos = (short) (block.getReadStart() + i - 1);
-                            if (read.getBaseQualities()[basePos] < minReadQuality) {
+							if (basePos < 0 || basePos >= quals.length) {
+								continue;
+							}
+                            if (quals[basePos] < minReadQuality) {
                                 continue;
                             }
                             int baseId = MosaicHunterHelper.BASE_TO_ID[bases[basePos]];
