@@ -480,9 +480,6 @@ public class MisalignedReadsFilter extends BaseFilter {
                  AlignmentEntry entry = new AlignmentEntry();
                  String id = tokens[9];
                  entry.chr = tokens[13];
-                 if (entry.chr.startsWith("chr")) {
-                     entry.chr = entry.chr.substring(3); 
-                 }
                  entry.score = Integer.parseInt(tokens[0]) +
                                Integer.parseInt(tokens[2]) - 
                                Integer.parseInt(tokens[1]) - 
